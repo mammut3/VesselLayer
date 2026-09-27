@@ -1,7 +1,7 @@
 # Specification
 
-This directory will hold normative, technology-neutral VesselLayer contracts and schemas when concrete validation justifies them.
+This directory will hold normative, technology-neutral VesselLayer contracts and JSON Schema 2020-12 documents as concrete consumer validation justifies them.
 
-The bootstrap deliberately does not select JSON Schema, Protocol Buffers, OpenAPI, a programming language, or an executable runtime. Any future representation must preserve the architecture and glossary, support deterministic conformance vectors, avoid transport-specific types, and be accepted through a documented decision.
+JSON Schema is selected for serialized descriptors, evidence, fixture envelopes, and expected results. Behavioral rules remain normative prose plus conformance vectors. The pure-Swift reference API is idiomatic and is not generated wholesale from the schemas; future language implementations may generate transfer models where useful.
 
-Until versioned normative artifacts are added, [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md), [docs/GLOSSARY.md](../docs/GLOSSARY.md), and [docs/CONFORMANCE.md](../docs/CONFORMANCE.md) define the project foundation.
+Until versioned schemas are added, [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md), [docs/GLOSSARY.md](../docs/GLOSSARY.md), [docs/CONFORMANCE.md](../docs/CONFORMANCE.md), and [docs/IMPLEMENTATION_ARCHITECTURE.md](../docs/IMPLEMENTATION_ARCHITECTURE.md) define the project foundation.

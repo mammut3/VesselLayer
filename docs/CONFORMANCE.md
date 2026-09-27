@@ -16,4 +16,4 @@ Future conformance coverage should include:
 
 A conformance vector proves agreement with a specified contract; it does not certify marine equipment, a vessel installation, an adapter, or a control path as safe.
 
-This bootstrap defines principles only. It does not select a schema format or build a test runner.
+JSON Schema 2020-12 is the selected serialized format for conformance inputs and expected results. The first implementation tranche will add the minimum schemas, public synthetic vectors, and Swift test support required by HelmBrain's read-only slice; this decision task does not build the runner.

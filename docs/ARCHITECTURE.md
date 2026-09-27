@@ -76,6 +76,12 @@ Writing bytes is not success. An uncertain outcome is never reported as success,
 
 Clocks and scheduling are injectable so freshness, timeouts, provider disappearance, and deterministic resolution can be tested with controlled time. Technology-neutral fixtures and expected results define behavior across implementations.
 
+## Initial implementation
+
+VesselLayer's normative contract remains technology-neutral. JSON Schema 2020-12 represents serialized descriptors, evidence, and conformance fixtures; normative prose and input/expected-result vectors specify behavior.
+
+The initial executable reference is a pure-Swift package with a small core library and test-support target. It implements the read-only provider/observation/authority surface required by the first consumer without SwiftUI, networking, protocol decoders, databases, or application policy. Future native implementations must pass the same conformance suite; no shared binary runtime is required. See [IMPLEMENTATION_ARCHITECTURE.md](IMPLEMENTATION_ARCHITECTURE.md).
+
 ## Non-goals and ownership
 
 VesselLayer does not implement marine transports/protocols, NMEA discovery, codecs, charts, routes, geodesy, physical control loops, workflow engines, cloud services, plugin hosting, UI, or application features. Signal K is important semantic/provider prior art and a future adapter target, not a runtime dependency or core type system. CANboat and gateway SDKs remain below adapters.
