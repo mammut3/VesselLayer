@@ -1,5 +1,7 @@
 # VesselLayer
 
+VesselLayer is maintained and published by **Two Fish Outfitters LLC**.
+
 > **VesselLayer is an open, vendor-neutral capability framework for marine applications. It represents what a vessel can observe and do independently of the underlying protocols, devices, manufacturers, transports, and applications.**
 
 VesselLayer is the semantic seam between marine infrastructure and application behavior. Marine applications should not need to understand transports, PGNs/messages, manufacturers, or individual device APIs before they can answer:
