@@ -22,8 +22,8 @@
     "event": {
       "type":"object", "required":["type"],
       "properties": {
-        "type":{"enum":["register","present","unavailable","withdraw","observe","advance"]},
-        "providerID":{"type":"string"}, "seconds":{"type":"integer","minimum":0}, "value":{"type":"number"}
+        "type":{"enum":["register","present","unavailable","withdraw","remove","reconcile","observe","advance"]},
+        "providerID":{"type":"string"}, "targetProviderID":{"type":"string"}, "seconds":{"type":"integer","minimum":0}, "value":{"type":"number"}
       }
     },
     "policy": {

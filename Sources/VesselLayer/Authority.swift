@@ -131,6 +131,66 @@ public actor VesselObservationStore {
         state.lifecycle = .withdrawn; state.updatedAt = await clock.now(); providers[id] = state
     }
 
+    /// Permanently removes a provider and all of its latest observation candidates.
+    /// Use withdrawal when historical/current-state inspection is still useful; use
+    /// removal for session-scoped identities that are no longer meaningful.
+    public func removeProvider(_ id: ProviderID) {
+        providers.removeValue(forKey: id)
+        for observationID in Array(candidates.keys) {
+            candidates[observationID]?.removeValue(forKey: id)
+            if candidates[observationID]?.isEmpty == true {
+                candidates.removeValue(forKey: observationID)
+            }
+        }
+    }
+
+    /// Atomically replaces a provisional provider identity with a stronger generic
+    /// provider descriptor. Latest observations follow the durable provider without
+    /// leaving the provisional source eligible as a duplicate candidate.
+    public func reconcileProvider(from provisionalID: ProviderID,
+                                  to durableDescriptor: ProviderDescriptor) async {
+        guard provisionalID != durableDescriptor.id,
+              let provisional = providers[provisionalID]
+        else {
+            if provisionalID == durableDescriptor.id, var current = providers[provisionalID] {
+                current.descriptor = durableDescriptor
+                current.updatedAt = await clock.now()
+                providers[provisionalID] = current
+            }
+            return
+        }
+
+        if var durable = providers[durableDescriptor.id] {
+            durable.descriptor = durableDescriptor
+            providers[durableDescriptor.id] = durable
+        } else {
+            providers[durableDescriptor.id] = ProviderState(
+                descriptor: durableDescriptor,
+                lifecycle: provisional.lifecycle,
+                health: provisional.health,
+                updatedAt: provisional.updatedAt)
+        }
+
+        for observationID in Array(candidates.keys) {
+            guard var byProvider = candidates[observationID],
+                  var provisionalObservation = byProvider.removeValue(forKey: provisionalID)
+            else { continue }
+            provisionalObservation.source.providerID = durableDescriptor.id
+            if let assetID = durableDescriptor.assetID {
+                provisionalObservation.source.assetID = assetID
+            }
+            if let existing = byProvider[durableDescriptor.id] {
+                if provisionalObservation.receivedAt.nanoseconds > existing.receivedAt.nanoseconds {
+                    byProvider[durableDescriptor.id] = provisionalObservation
+                }
+            } else {
+                byProvider[durableDescriptor.id] = provisionalObservation
+            }
+            candidates[observationID] = byProvider
+        }
+        providers.removeValue(forKey: provisionalID)
+    }
+
     public func providerState(_ id: ProviderID) -> ProviderState? { providers[id] }
 
     public func allProviderStates() -> [ProviderState] {

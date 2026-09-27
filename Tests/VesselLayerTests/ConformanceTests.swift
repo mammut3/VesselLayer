@@ -11,7 +11,7 @@ private struct Vector: Decodable {
     let expectedProviderID: String?
     let expectedReason: String
 }
-private struct Event: Decodable { let type: String; let providerID: String?; let seconds: UInt64?; let value: Double? }
+private struct Event: Decodable { let type: String; let providerID: String?; let targetProviderID: String?; let seconds: UInt64?; let value: Double? }
 private struct Policy: Decodable { let freshForSeconds: UInt64; let providerRanks: [String: Int] }
 
 @Test func publicTechnologyNeutralAuthorityVectors() async throws {
@@ -33,6 +33,10 @@ private struct Policy: Decodable { let freshForSeconds: UInt64; let providerRank
             case "present": await store.updateProvider(id, lifecycle: .present, health: .healthy)
             case "unavailable": await store.updateProvider(id, lifecycle: .unavailable, health: .unhealthy)
             case "withdraw": await store.withdrawProvider(id)
+            case "remove": await store.removeProvider(id)
+            case "reconcile":
+                let target = event.targetProviderID ?? ""
+                await store.reconcileProvider(from: id, to: TestProviders.descriptor(target))
             case "observe":
                 await store.ingest(AnyObservation(id: .navigationHeading,
                     value: .heading(.init(radians: event.value ?? 0, reference: .trueNorth)),

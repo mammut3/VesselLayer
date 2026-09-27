@@ -6,6 +6,7 @@ JSON Schema is selected for serialized descriptors, evidence, fixture envelopes,
 
 The schemas and public synthetic vectors under `fixtures/conformance/0.1.0` cover
 read-only provider and asset lifecycle, controlled time, freshness, deterministic
-read authority, transport-neutral asset/provider matching, and capability state.
+read authority, provisional provider reconciliation/removal, transport-neutral
+asset/provider matching, and capability state.
 The architecture and conformance documents remain authoritative for behavior not captured
 by JSON Schema.

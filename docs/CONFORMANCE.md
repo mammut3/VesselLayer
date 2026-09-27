@@ -6,6 +6,7 @@ Conformance coverage includes public synthetic vectors for deterministic read
 authority and asset lifecycle. Further vectors should include:
 
 - provider registration and lifecycle;
+- provisional-to-durable provider reconciliation and obsolete-provider removal;
 - asset/provider matching from generic evidence;
 - observation validity, freshness, quality, and provenance;
 - deterministic source authority and stable tie-breaking;
