@@ -60,6 +60,12 @@ The same contracts should accept providers originating from NMEA 2000, Signal K,
 
 Provider lifecycle distinguishes declaration/registration, presence, health, disappearance, reappearance, and withdrawal. Registration or arrival order never establishes authority. A provider may be present but unavailable, matched but unqualified, qualified but unauthorized, or authorized but currently unhealthy.
 
+Session-scoped provider identities may be atomically reconciled into stronger,
+durable generic identities. Reconciliation migrates the latest candidates and
+removes the provisional provider so it cannot remain an eligible duplicate.
+Adapters remove obsolete session-scoped providers and their candidates when a
+session ends; durable providers may remain across transport sessions.
+
 Provider-to-asset association is explicit and optional. A match has an explicit
 state—candidate, matched, needs confirmation, or rejected—and traceable evidence
 and explanation. VesselLayer does not compute an unexplained confidence number

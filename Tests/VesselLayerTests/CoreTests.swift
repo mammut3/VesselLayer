@@ -83,6 +83,47 @@ import VesselLayerTesting
         #expect(await store.allCandidates(for: .navigationHeading).map(\.source.providerID) == [ProviderID(rawValue: "a"), ProviderID(rawValue: "b")])
     }
 
+    @Test func reconcilesProvisionalProviderWithoutDuplicateCandidate() async {
+        let clock = ManualClock(); let store = VesselObservationStore(clock: clock)
+        let provisional = TestProviders.descriptor("session-source")
+        let durable = ProviderDescriptor(id: .init(rawValue: "durable-node"),
+                                         vesselID: provisional.vesselID,
+                                         assetID: .init(rawValue: "durable-asset"),
+                                         label: "Durable node")
+        _ = await store.register(provisional)
+        await store.updateProvider(provisional.id, lifecycle: .present, health: .healthy)
+        await store.ingest(heading(provider: provisional.id, value: 1, time: await clock.now()))
+
+        await store.reconcileProvider(from: provisional.id, to: durable)
+
+        #expect(await store.providerState(provisional.id) == nil)
+        #expect(await store.providerState(durable.id)?.availability == .available)
+        let migrated = await store.allCandidates(for: .navigationHeading)
+        #expect(migrated.count == 1)
+        #expect(migrated[0].source.providerID == durable.id)
+        #expect(migrated[0].source.assetID == durable.assetID)
+    }
+
+    @Test func reconciliationKeepsNewestDurableCandidateAndRemovalPrunesState() async {
+        let clock = ManualClock(); let store = VesselObservationStore(clock: clock)
+        let provisional = TestProviders.descriptor("session-source")
+        let durable = TestProviders.descriptor("durable-node")
+        _ = await store.register(provisional); _ = await store.register(durable)
+        await store.ingest(heading(provider: provisional.id, value: 1, time: await clock.now()))
+        await clock.advance(by: .seconds(1))
+        await store.ingest(heading(provider: durable.id, value: 2, time: await clock.now()))
+
+        await store.reconcileProvider(from: provisional.id, to: durable)
+        let candidates = await store.allCandidates(for: .navigationHeading)
+        #expect(candidates.count == 1)
+        #expect(candidates[0].source.providerID == durable.id)
+        #expect(candidates[0].receivedAt.nanoseconds == 1_000_000_000)
+
+        await store.removeProvider(durable.id)
+        #expect(await store.allProviderStates().isEmpty)
+        #expect(await store.allCandidates(for: .navigationHeading).isEmpty)
+    }
+
     @Test func assetInventoryPreservesIdentityAcrossLifecycleAndEnrichment() async {
         let inventory = AssetInventory()
         let id = AssetID(rawValue: "synthetic-heading-unit")
