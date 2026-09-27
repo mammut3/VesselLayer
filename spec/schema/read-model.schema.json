@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vessellayer.org/schema/0.1.0/read-model.schema.json",
+  "title": "VesselLayer transport-neutral read model",
+  "oneOf": [
+    {"$ref": "#/$defs/assetDescriptor"},
+    {"$ref": "#/$defs/assetState"},
+    {"$ref": "#/$defs/providerDescriptor"},
+    {"$ref": "#/$defs/providerMatch"},
+    {"$ref": "#/$defs/capabilityState"},
+    {"$ref": "#/$defs/dataSourceMapEntry"}
+  ],
+  "$defs": {
+    "identifier": {"type": "string", "minLength": 1},
+    "stringMap": {"type": "object", "additionalProperties": {"type": "string"}},
+    "assetDescriptor": {
+      "type": "object",
+      "required": ["id", "vesselID", "roles", "attributes"],
+      "properties": {
+        "id": {"$ref": "#/$defs/identifier"},
+        "vesselID": {"$ref": "#/$defs/identifier"},
+        "label": {"type": ["string", "null"]},
+        "manufacturer": {"type": ["string", "null"]},
+        "model": {"type": ["string", "null"]},
+        "productIdentifier": {"type": ["string", "null"]},
+        "softwareVersion": {"type": ["string", "null"]},
+        "roles": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "attributes": {"$ref": "#/$defs/stringMap"}
+      },
+      "additionalProperties": false
+    },
+    "monotonicInstant": {
+      "type": "object", "required": ["nanoseconds"],
+      "properties": {"nanoseconds": {"type": "integer", "minimum": 0}},
+      "additionalProperties": false
+    },
+    "assetState": {
+      "type": "object",
+      "required": ["descriptor", "presence", "health", "identityState", "firstSeenAt", "lastSeenAt", "updatedAt", "evidenceIDs"],
+      "properties": {
+        "descriptor": {"$ref": "#/$defs/assetDescriptor"},
+        "presence": {"enum": ["unknown", "present", "missing"]},
+        "health": {"enum": ["healthy", "degraded", "unhealthy", "unknown"]},
+        "identityState": {"enum": ["partial", "identified", "ambiguous", "conflicting"]},
+        "firstSeenAt": {"$ref": "#/$defs/monotonicInstant"},
+        "lastSeenAt": {"$ref": "#/$defs/monotonicInstant"},
+        "updatedAt": {"$ref": "#/$defs/monotonicInstant"},
+        "evidenceIDs": {"type": "array", "items": {"$ref": "#/$defs/identifier"}, "uniqueItems": true}
+      },
+      "additionalProperties": false
+    },
+    "providerDescriptor": {
+      "type": "object",
+      "required": ["id", "vesselID", "label", "observationIDs", "operationIDs"],
+      "properties": {
+        "id": {"$ref": "#/$defs/identifier"},
+        "vesselID": {"$ref": "#/$defs/identifier"},
+        "assetID": {"type": ["string", "null"], "minLength": 1},
+        "label": {"type": "string"},
+        "observationIDs": {"type": "array", "items": {"$ref": "#/$defs/identifier"}, "uniqueItems": true},
+        "operationIDs": {"type": "array", "items": {"$ref": "#/$defs/identifier"}, "uniqueItems": true}
+      },
+      "additionalProperties": false
+    },
+    "evidenceReference": {
+      "type": "object",
+      "required": ["id", "kind", "summary", "attributes"],
+      "properties": {
+        "id": {"$ref": "#/$defs/identifier"},
+        "kind": {"type": "string", "minLength": 1},
+        "summary": {"type": "string", "minLength": 1},
+        "attributes": {"$ref": "#/$defs/stringMap"}
+      },
+      "additionalProperties": false
+    },
+    "providerMatch": {
+      "type": "object",
+      "required": ["providerID", "assetID", "state", "evidence", "explanation"],
+      "properties": {
+        "providerID": {"$ref": "#/$defs/identifier"},
+        "assetID": {"$ref": "#/$defs/identifier"},
+        "state": {"enum": ["candidate", "matched", "needsConfirmation", "rejected"]},
+        "evidence": {"type": "array", "items": {"$ref": "#/$defs/evidenceReference"}, "minItems": 1},
+        "explanation": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "capabilityKind": {
+      "type": "object", "required": ["type", "id"],
+      "properties": {
+        "type": {"enum": ["observation", "operation"]},
+        "id": {"$ref": "#/$defs/identifier"}
+      },
+      "additionalProperties": false
+    },
+    "capabilityState": {
+      "type": "object",
+      "required": ["id", "kind", "availability", "providerIDs", "evidenceIDs", "reason"],
+      "properties": {
+        "id": {"$ref": "#/$defs/identifier"},
+        "kind": {"$ref": "#/$defs/capabilityKind"},
+        "availability": {"enum": ["available", "unavailable", "potential", "unqualified", "ambiguous"]},
+        "providerIDs": {"type": "array", "items": {"$ref": "#/$defs/identifier"}, "uniqueItems": true},
+        "evidenceIDs": {"type": "array", "items": {"$ref": "#/$defs/identifier"}, "uniqueItems": true},
+        "reason": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "observationSource": {
+      "type": "object", "required": ["providerID", "attributes"],
+      "properties": {
+        "providerID": {"$ref": "#/$defs/identifier"},
+        "assetID": {"type": ["string", "null"], "minLength": 1},
+        "attributes": {"$ref": "#/$defs/stringMap"}
+      },
+      "additionalProperties": false
+    },
+    "observation": {
+      "type": "object",
+      "required": ["id", "value", "source", "receivedAt", "validity"],
+      "properties": {
+        "id": {"$ref": "#/$defs/identifier"},
+        "value": {"type": "object"},
+        "source": {"$ref": "#/$defs/observationSource"},
+        "observedAt": {"type": ["number", "null"]},
+        "receivedAt": {"$ref": "#/$defs/monotonicInstant"},
+        "validity": {"enum": ["valid", "invalid", "unavailable"]},
+        "quality": {"type": ["object", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "authorityReason": {
+      "type": "object", "required": ["type"],
+      "properties": {
+        "type": {"enum": ["selectedOnlyEligibleCandidate", "selectedByPolicyRank", "selectedByQuality", "selectedByStableProviderID", "noRegisteredCandidates", "noEligibleCandidates"]},
+        "rank": {"type": "integer"}
+      },
+      "additionalProperties": false
+    },
+    "sourceCandidate": {
+      "type": "object",
+      "required": ["observation", "providerLifecycle", "providerHealth", "providerAvailability", "freshness", "isAuthoritative"],
+      "properties": {
+        "observation": {"$ref": "#/$defs/observation"},
+        "providerLifecycle": {"enum": ["registered", "present", "unavailable", "withdrawn"]},
+        "providerHealth": {"enum": ["healthy", "degraded", "unhealthy", "unknown"]},
+        "providerAvailability": {"enum": ["available", "unavailable", "withdrawn"]},
+        "freshness": {"enum": ["fresh", "stale"]},
+        "isAuthoritative": {"type": "boolean"},
+        "authorityReason": {"anyOf": [{"$ref": "#/$defs/authorityReason"}, {"type": "null"}]}
+      },
+      "additionalProperties": false
+    },
+    "dataSourceMapEntry": {
+      "type": "object", "required": ["observationID", "candidates", "authorityReason"],
+      "properties": {
+        "observationID": {"$ref": "#/$defs/identifier"},
+        "candidates": {"type": "array", "items": {"$ref": "#/$defs/sourceCandidate"}},
+        "authorityReason": {"$ref": "#/$defs/authorityReason"}
+      },
+      "additionalProperties": false
+    }
+  }
+}

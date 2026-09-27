@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vessellayer.org/schema/0.1.0/read-model-conformance-vector.schema.json",
+  "title": "VesselLayer read-model conformance vectors",
+  "type": "object",
+  "required": ["schemaVersion", "vectors"],
+  "properties": {
+    "$schema": {"type": "string", "format": "uri"},
+    "schemaVersion": {"const": "0.1.0"},
+    "vectors": {"type": "array", "items": {"$ref": "#/$defs/vector"}, "minItems": 1}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "vector": {
+      "type": "object",
+      "required": ["id", "events", "expected"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "events": {"type": "array", "items": {"$ref": "#/$defs/event"}, "minItems": 1},
+        "expected": {"$ref": "#/$defs/expected"}
+      },
+      "additionalProperties": false
+    },
+    "event": {
+      "type": "object",
+      "required": ["type", "at"],
+      "properties": {
+        "type": {"enum": ["observePartial", "observeIdentified", "observeAmbiguous", "observeConflicting", "markMissing"]},
+        "at": {"type": "integer", "minimum": 0},
+        "manufacturer": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "expected": {
+      "type": "object",
+      "required": ["changes", "presence", "identityState", "firstSeenAt", "lastSeenAt", "updatedAt"],
+      "properties": {
+        "changes": {"type": "array", "items": {"enum": ["new", "observed", "changed", "missing", "reappeared", "ambiguous", "conflicting"]}},
+        "presence": {"enum": ["unknown", "present", "missing"]},
+        "identityState": {"enum": ["partial", "identified", "ambiguous", "conflicting"]},
+        "firstSeenAt": {"type": "integer", "minimum": 0},
+        "lastSeenAt": {"type": "integer", "minimum": 0},
+        "updatedAt": {"type": "integer", "minimum": 0},
+        "manufacturer": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -13,9 +13,9 @@ HelmBrain is the first consumer and proves the Swift implementation, but the pac
 
 ## Initial package boundary
 
-The first implementation tranche should add only:
+The current read-only implementation includes only:
 
-- a `VesselLayer` library target containing identifiers, typed observations, provider descriptors/lifecycle, validity/freshness/quality, availability, qualification/evidence values, deterministic read-source authority, and an injectable clock;
+- a `VesselLayer` library target containing identifiers, typed observations, transport-neutral asset descriptors and in-memory lifecycle, provider descriptors/lifecycle and asset relationships, explicit provider-match evidence, validity/freshness/quality, source-map snapshots, capability availability, qualification/evidence values, deterministic read-source authority, and an injectable clock;
 - a `VesselLayerTesting` target containing a manual clock, test providers, conformance-vector loading, and reusable assertions; and
 - versioned JSON Schemas and public synthetic conformance vectors.
 

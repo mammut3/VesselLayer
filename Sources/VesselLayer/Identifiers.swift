@@ -12,6 +12,7 @@ public struct AssetID: VesselLayerIdentifier { public let rawValue: String; publ
 public struct ProviderID: VesselLayerIdentifier { public let rawValue: String; public init(rawValue: String) { self.rawValue = rawValue } }
 public struct ObservationID: VesselLayerIdentifier { public let rawValue: String; public init(rawValue: String) { self.rawValue = rawValue } }
 public struct EvidenceID: VesselLayerIdentifier { public let rawValue: String; public init(rawValue: String) { self.rawValue = rawValue } }
+public struct CapabilityID: VesselLayerIdentifier { public let rawValue: String; public init(rawValue: String) { self.rawValue = rawValue } }
 public struct OperationID: VesselLayerIdentifier { public let rawValue: String; public init(rawValue: String) { self.rawValue = rawValue } }
 
 public extension ObservationID {

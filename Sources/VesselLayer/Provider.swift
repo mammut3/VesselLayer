@@ -13,8 +13,13 @@ public struct ProviderDescriptor: Hashable, Codable, Sendable {
     public var vesselID: VesselID
     public var assetID: AssetID?
     public var label: String
-    public init(id: ProviderID, vesselID: VesselID, assetID: AssetID? = nil, label: String) {
+    public var observationIDs: [ObservationID]
+    public var operationIDs: [OperationID]
+    public init(id: ProviderID, vesselID: VesselID, assetID: AssetID? = nil, label: String,
+                observationIDs: [ObservationID] = [], operationIDs: [OperationID] = []) {
         self.id = id; self.vesselID = vesselID; self.assetID = assetID; self.label = label
+        self.observationIDs = Array(Set(observationIDs)).sorted()
+        self.operationIDs = Array(Set(operationIDs)).sorted()
     }
 }
 

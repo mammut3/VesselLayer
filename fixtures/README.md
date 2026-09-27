@@ -11,5 +11,6 @@ Raw or identifying vessel evidence must not be committed to this public reposito
 Every derived fixture should record its provenance category, transformation method, applicable contract/specification version, and expected semantic result. Sanitized fixtures supplement rather than replace restricted raw evidence.
 
 The vectors under `conformance/0.1.0` are original synthetic/public scenarios.
-They exercise the initial provider lifecycle, controlled time, freshness, and
-deterministic read-authority contract and contain no vessel-derived data.
+They exercise provider lifecycle, controlled time, freshness, deterministic
+read authority, asset enrichment, disappearance/reappearance, and explicit
+ambiguous/conflicting identity states. They contain no vessel-derived data.
