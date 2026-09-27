@@ -52,7 +52,8 @@ VesselLayer is **early-stage and pre-1.0**. Its contracts will evolve as they ar
 The normative specification and conformance artifacts remain technology-neutral. The selected initial executable implementation is a small pure-Swift reference package distributed with Swift Package Manager, with JSON Schema 2020-12 used for serialized contracts and conformance fixtures. The Swift API does not become the cross-language specification. See [docs/IMPLEMENTATION_ARCHITECTURE.md](docs/IMPLEMENTATION_ARCHITECTURE.md).
 
 Build and test the reference implementation with `swift test`. `VesselLayer`
-contains portable runtime contracts and deterministic read-source selection;
+contains portable runtime contracts, an in-memory asset inventory, explainable
+provider matching and capability state, and deterministic read-source selection;
 `VesselLayerTesting` supplies a manual monotonic clock and synthetic-provider
 helpers. Swift tests execute the public cross-language vectors in `fixtures`.
 

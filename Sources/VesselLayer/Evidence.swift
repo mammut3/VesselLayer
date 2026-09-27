@@ -8,15 +8,21 @@ public struct QualificationEvidence: Hashable, Codable, Sendable {
     public var id: EvidenceID
     public var providerID: ProviderID
     public var vesselID: VesselID?
+    public var assetID: AssetID?
+    public var capabilityID: CapabilityID?
+    public var observationID: ObservationID?
     public var operationID: OperationID?
     public var level: QualificationLevel
     public var implementationVersion: String
     public var recordedAt: Date
     public var reference: String
     public init(id: EvidenceID, providerID: ProviderID, vesselID: VesselID? = nil,
-                operationID: OperationID? = nil, level: QualificationLevel,
+                assetID: AssetID? = nil, capabilityID: CapabilityID? = nil,
+                observationID: ObservationID? = nil, operationID: OperationID? = nil,
+                level: QualificationLevel,
                 implementationVersion: String, recordedAt: Date, reference: String) {
-        self.id = id; self.providerID = providerID; self.vesselID = vesselID; self.operationID = operationID
+        self.id = id; self.providerID = providerID; self.vesselID = vesselID; self.assetID = assetID
+        self.capabilityID = capabilityID; self.observationID = observationID; self.operationID = operationID
         self.level = level; self.implementationVersion = implementationVersion; self.recordedAt = recordedAt; self.reference = reference
     }
 }

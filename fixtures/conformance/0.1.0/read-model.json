@@ -1,0 +1,33 @@
+{
+  "$schema": "https://vessellayer.org/schema/0.1.0/read-model-conformance-vector.schema.json",
+  "schemaVersion": "0.1.0",
+  "vectors": [
+    {
+      "id": "partial-enrichment",
+      "events": [
+        {"type": "observePartial", "at": 10},
+        {"type": "observeIdentified", "at": 20, "manufacturer": "Synthetic Marine"}
+      ],
+      "expected": {"changes": ["new", "changed"], "presence": "present", "identityState": "identified", "firstSeenAt": 10, "lastSeenAt": 20, "updatedAt": 20, "manufacturer": "Synthetic Marine"}
+    },
+    {
+      "id": "missing-and-reappeared",
+      "events": [
+        {"type": "observeIdentified", "at": 10, "manufacturer": "Synthetic Marine"},
+        {"type": "markMissing", "at": 30},
+        {"type": "observeIdentified", "at": 40, "manufacturer": "Synthetic Marine"}
+      ],
+      "expected": {"changes": ["new", "missing", "reappeared"], "presence": "present", "identityState": "identified", "firstSeenAt": 10, "lastSeenAt": 40, "updatedAt": 40, "manufacturer": "Synthetic Marine"}
+    },
+    {
+      "id": "ambiguous-evidence",
+      "events": [{"type": "observeAmbiguous", "at": 10}],
+      "expected": {"changes": ["ambiguous"], "presence": "present", "identityState": "ambiguous", "firstSeenAt": 10, "lastSeenAt": 10, "updatedAt": 10, "manufacturer": null}
+    },
+    {
+      "id": "conflicting-evidence",
+      "events": [{"type": "observeConflicting", "at": 10}],
+      "expected": {"changes": ["conflicting"], "presence": "present", "identityState": "conflicting", "firstSeenAt": 10, "lastSeenAt": 10, "updatedAt": 10, "manufacturer": null}
+    }
+  ]
+}

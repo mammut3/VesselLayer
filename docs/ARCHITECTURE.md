@@ -28,6 +28,18 @@ Dependencies point inward through the provider boundary. VesselLayer core contra
 - **Authority policy** deterministically resolves equivalent providers/sources for a stated purpose.
 - **Availability** is current runtime usability after presence, health, dependencies, qualification, authorization, and constraints are evaluated.
 
+The generic asset descriptor may include user-facing manufacturer, model,
+product, software, and role strings when an adapter has evidence for them. It
+does not contain a transport address or protocol identity. Adapter evidence may
+be referenced by stable evidence identifiers or represented as bounded opaque
+attributes, but sensitive stable identifiers should not be promoted into public
+diagnostics or UI by default.
+
+`AssetID` is always a stable key for an inventory record, but it is not a claim
+of durable physical identity while that record's identity state is partial.
+Adapters may create a session-scoped record for incomplete evidence, then
+explicitly reconcile or retire it when stronger identity evidence arrives.
+
 Asset Inventory, Data Source Map, provider matching, Capability Map, qualification, authorization, and availability are related but distinct. Implementations should not force them into one monotonic enum when orthogonal state is clearer.
 
 ## Provider boundary and lifecycle
@@ -48,9 +60,20 @@ The same contracts should accept providers originating from NMEA 2000, Signal K,
 
 Provider lifecycle distinguishes declaration/registration, presence, health, disappearance, reappearance, and withdrawal. Registration or arrival order never establishes authority. A provider may be present but unavailable, matched but unqualified, qualified but unauthorized, or authorized but currently unhealthy.
 
+Provider-to-asset association is explicit and optional. A match has an explicit
+state—candidate, matched, needs confirmation, or rejected—and traceable evidence
+and explanation. VesselLayer does not compute an unexplained confidence number
+or infer a match from registration order.
+
 ## Source authority
 
 Multiple providers may publish equivalent observations. Resolution is deterministic and policy-driven. Inputs may include vessel/user policy, purpose, qualification, validity, freshness, quality, provider health, and a stable tie-breaker. VesselLayer supplies the contract and deterministic mechanism; applications supply policy without embedding application-specific behavior in core.
+
+A Data Source Map retains every latest candidate observation, including stale,
+invalid, unhealthy, and non-authoritative candidates. Authority is a property of
+the current decision, not of observation arrival order. A read capability is
+available only while at least one fresh, valid observation from an available
+provider is authoritative; losing that source does not erase its evidence.
 
 ## Qualification and authorization
 
