@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vessellayer.org/schema/0.1.0/conformance-vector.schema.json",
+  "title": "VesselLayer read-authority conformance vectors",
+  "type": "object",
+  "required": ["schemaVersion", "vectors"],
+  "properties": {
+    "schemaVersion": {"const": "0.1.0"},
+    "vectors": {"type":"array", "items":{"$ref":"#/$defs/vector"}}
+  },
+  "$defs": {
+    "vector": {
+      "type":"object", "required":["id","events","policy","expectedReason"],
+      "properties": {
+        "id":{"type":"string","minLength":1},
+        "events":{"type":"array","items":{"$ref":"#/$defs/event"}},
+        "policy":{"$ref":"#/$defs/policy"},
+        "expectedProviderID":{"type":["string","null"]},
+        "expectedReason":{"enum":["onlyEligible","policyRank","quality","stableProviderID","noRegisteredCandidates","noEligibleCandidates"]}
+      }
+    },
+    "event": {
+      "type":"object", "required":["type"],
+      "properties": {
+        "type":{"enum":["register","present","unavailable","withdraw","observe","advance"]},
+        "providerID":{"type":"string"}, "seconds":{"type":"integer","minimum":0}, "value":{"type":"number"}
+      }
+    },
+    "policy": {
+      "type":"object", "required":["freshForSeconds","providerRanks"],
+      "properties": {
+        "freshForSeconds":{"type":"integer","minimum":0},
+        "providerRanks":{"type":"object","additionalProperties":{"type":"integer"}}
+      }
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://vessellayer.org/schema/0.1.0/conformance-vector.schema.json",
+  "schemaVersion": "0.1.0",
+  "vectors": [
+    {"id":"registration-valid-observation","events":[{"type":"register","providerID":"a"},{"type":"present","providerID":"a"},{"type":"observe","providerID":"a","value":1.0}],"policy":{"freshForSeconds":5,"providerRanks":{}},"expectedProviderID":"a","expectedReason":"onlyEligible"},
+    {"id":"stable-tie-break","events":[{"type":"register","providerID":"b"},{"type":"present","providerID":"b"},{"type":"observe","providerID":"b","value":2.0},{"type":"register","providerID":"a"},{"type":"present","providerID":"a"},{"type":"observe","providerID":"a","value":1.0}],"policy":{"freshForSeconds":5,"providerRanks":{}},"expectedProviderID":"a","expectedReason":"stableProviderID"},
+    {"id":"freshness-failover","events":[{"type":"register","providerID":"preferred"},{"type":"present","providerID":"preferred"},{"type":"observe","providerID":"preferred","value":1.0},{"type":"advance","seconds":4},{"type":"register","providerID":"fallback"},{"type":"present","providerID":"fallback"},{"type":"observe","providerID":"fallback","value":2.0},{"type":"advance","seconds":2}],"policy":{"freshForSeconds":5,"providerRanks":{"preferred":0,"fallback":1}},"expectedProviderID":"fallback","expectedReason":"onlyEligible"},
+    {"id":"withdrawal","events":[{"type":"register","providerID":"a"},{"type":"present","providerID":"a"},{"type":"observe","providerID":"a","value":1.0},{"type":"withdraw","providerID":"a"}],"policy":{"freshForSeconds":5,"providerRanks":{}},"expectedProviderID":null,"expectedReason":"noEligibleCandidates"}
+  ]
+}
