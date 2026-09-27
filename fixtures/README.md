@@ -9,3 +9,7 @@ VesselLayer conformance work distinguishes three evidence classes:
 Raw or identifying vessel evidence must not be committed to this public repository. In particular, do not publish Sunrise captures, fishing locations, stable equipment identifiers, credentials, or proprietary standards material.
 
 Every derived fixture should record its provenance category, transformation method, applicable contract/specification version, and expected semantic result. Sanitized fixtures supplement rather than replace restricted raw evidence.
+
+The vectors under `conformance/0.1.0` are original synthetic/public scenarios.
+They exercise the initial provider lifecycle, controlled time, freshness, and
+deterministic read-authority contract and contain no vessel-derived data.
