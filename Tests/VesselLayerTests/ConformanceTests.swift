@@ -16,7 +16,7 @@ private struct Policy: Decodable { let freshForSeconds: UInt64; let providerRank
 
 @Test func publicTechnologyNeutralAuthorityVectors() async throws {
     let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-        .appendingPathComponent("../../../fixtures/conformance/0.1.0/read-authority.json")
+        .appendingPathComponent("../../fixtures/conformance/0.1.0/read-authority.json")
         .standardizedFileURL
     let file = try JSONDecoder().decode(VectorFile.self, from: Data(contentsOf: url))
     #expect(file.schemaVersion == "0.1.0")
