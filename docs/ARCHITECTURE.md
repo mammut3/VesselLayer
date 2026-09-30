@@ -89,6 +89,10 @@ Recognizing a manufacturer/model, matching a provider, or receiving valid data n
 
 ## Commands and outcomes
 
+The accepted executable-operation ownership and the deliberately deferred 003B
+implementation are recorded in
+[VL-ADR-002](decisions/VL-ADR-002-EXECUTABLE-OPERATIONS.md).
+
 A command request carries semantic operation identity, arguments, correlation/idempotency identity, constraints, and cancellation context. Outcomes distinguish at least:
 
 - accepted;
