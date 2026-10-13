@@ -115,20 +115,25 @@ public actor VesselObservationStore {
     public init(clock: any VesselLayerClock) { self.clock = clock }
 
     @discardableResult public func register(_ descriptor: ProviderDescriptor) async -> ProviderState {
+        let now = await clock.now()
         if let existing = providers[descriptor.id] { return existing }
-        let state = ProviderState(descriptor: descriptor, updatedAt: await clock.now())
+        let state = ProviderState(descriptor: descriptor, updatedAt: now)
         providers[descriptor.id] = state
         return state
     }
 
     public func updateProvider(_ id: ProviderID, lifecycle: ProviderLifecycle, health: ProviderHealth) async {
+        // Clock reads can suspend. Inspect terminal lifecycle only after that hop,
+        // with no suspension between the final check and mutation.
+        let now = await clock.now()
         guard var state = providers[id], state.lifecycle != .withdrawn else { return }
-        state.lifecycle = lifecycle; state.health = health; state.updatedAt = await clock.now(); providers[id] = state
+        state.lifecycle = lifecycle; state.health = health; state.updatedAt = now; providers[id] = state
     }
 
     public func withdrawProvider(_ id: ProviderID) async {
+        let now = await clock.now()
         guard var state = providers[id] else { return }
-        state.lifecycle = .withdrawn; state.updatedAt = await clock.now(); providers[id] = state
+        state.lifecycle = .withdrawn; state.updatedAt = now; providers[id] = state
     }
 
     /// Permanently removes a provider and all of its latest observation candidates.
@@ -149,12 +154,13 @@ public actor VesselObservationStore {
     /// leaving the provisional source eligible as a duplicate candidate.
     public func reconcileProvider(from provisionalID: ProviderID,
                                   to durableDescriptor: ProviderDescriptor) async {
+        let now = await clock.now()
         guard provisionalID != durableDescriptor.id,
               let provisional = providers[provisionalID]
         else {
             if provisionalID == durableDescriptor.id, var current = providers[provisionalID] {
                 current.descriptor = durableDescriptor
-                current.updatedAt = await clock.now()
+                current.updatedAt = now
                 providers[provisionalID] = current
             }
             return
