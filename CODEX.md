@@ -8,6 +8,10 @@ Do not add marine transports, PGNs/codecs, NMEA discovery, Signal K runtime type
 
 VesselLayer is Apache-2.0 licensed and intentionally AI-assisted. Preserve the public AI-assisted-development disclosure and explicit human accountability in `README.md` and `CONTRIBUTING.md`.
 
+## HelmBrain ecosystem engineering work
+
+For work undertaken as part of the HelmBrain ecosystem, apply the HelmBrain repository's `CODEX.md`, section "Engineering work and validation", including the 1:1 planning checkpoint, named behavior/result/stopping conditions, and two-setup-failure rule. These are engineering practices only: preserve VesselLayer's independent, technology-neutral contracts and public contributor requirements, with qualification, authorization and availability kept separate.
+
 ## Provenance and licensing
 
 Follow `CONTRIBUTING.md` before incorporating external material. AI assistance does not change contributor responsibility for correctness, provenance, licensing, security, tests, or evidence.
