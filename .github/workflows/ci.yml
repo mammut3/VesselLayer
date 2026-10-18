@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  swift-and-conformance:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Swift tests
+        run: swift test
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install schema validator
+        run: python -m pip install jsonschema==4.23.0
+      - name: Validate conformance fixtures
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schemas = {}
+          for path in sorted(Path('spec/schema').glob('*.json')):
+              schema = json.loads(path.read_text())
+              Draft202012Validator.check_schema(schema)
+              schemas[schema['$id']] = schema
+          fixtures = sorted(Path('fixtures/conformance').rglob('*.json'))
+          assert fixtures, 'No conformance fixtures found'
+          for path in fixtures:
+              fixture = json.loads(path.read_text())
+              Draft202012Validator(schemas[fixture['$schema']]).validate(fixture)
+              print(f'PASS {path}')
+          print(f'Validated {len(fixtures)} fixtures against {len(schemas)} local schemas')
+          PY
