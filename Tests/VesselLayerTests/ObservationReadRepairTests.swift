@@ -42,6 +42,25 @@ struct ObservationReadRepairTests {
         #expect(await controlled.readCapability(for: .navigationPosition, id: .init(rawValue: "position"), policy: policy).availability == .unavailable)
     }
 
+    @Test(arguments: [false, true]) func withdrawalDuringReadClockIsReflected(capability: Bool) async throws {
+        let clock = ReadRepairClock()
+        let controlled = VesselObservationStore(clock: clock)
+        await controlled.register(descriptor)
+        await controlled.updateProvider(descriptor.id, lifecycle: .present, health: .healthy)
+        await controlled.ingest(sample(at: 1))
+        await clock.arm()
+        let read = Task {
+            if capability {
+                return await controlled.readCapability(for: .navigationPosition, id: .init(rawValue: "position"), policy: policy).availability == .available
+            }
+            return await controlled.sourceMapEntry(for: .navigationPosition, policy: policy).candidates.contains(where: \.isAuthoritative)
+        }
+        try await clock.waitUntilHeld()
+        await controlled.withdrawProvider(descriptor.id)
+        await clock.release()
+        #expect(await read.value == false)
+    }
+
     @Test func latestSlotRejectsOlderValidAndInvalidCompletionAndKeepsEqualArrivalOrder() async {
         let store = VesselObservationStore(clock: ReadRepairClock())
         await store.register(descriptor)

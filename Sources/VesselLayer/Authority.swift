@@ -1,3 +1,5 @@
+import Foundation
+
 public struct ReadAuthorityPolicy: Hashable, Codable, Sendable {
     /// Lower values are preferred. Unlisted providers share the default rank.
     public var providerRanks: [ProviderID: Int]
@@ -110,6 +112,7 @@ public struct DataSourceMapEntry: Hashable, Codable, Sendable {
 public actor VesselObservationStore {
     private let clock: any VesselLayerClock
     private var providers: [ProviderID: ProviderState] = [:]
+    private var providerRegistrationIDs: [ProviderID: UUID] = [:]
     private var candidates: [ObservationID: [ProviderID: AnyObservation]] = [:]
 
     public init(clock: any VesselLayerClock) { self.clock = clock }
@@ -119,6 +122,7 @@ public actor VesselObservationStore {
         if let existing = providers[descriptor.id] { return existing }
         let state = ProviderState(descriptor: descriptor, updatedAt: now)
         providers[descriptor.id] = state
+        providerRegistrationIDs[descriptor.id] = UUID()
         return state
     }
 
@@ -141,6 +145,7 @@ public actor VesselObservationStore {
     /// removal for session-scoped identities that are no longer meaningful.
     public func removeProvider(_ id: ProviderID) {
         providers.removeValue(forKey: id)
+        providerRegistrationIDs.removeValue(forKey: id)
         for observationID in Array(candidates.keys) {
             candidates[observationID]?.removeValue(forKey: id)
             if candidates[observationID]?.isEmpty == true {
@@ -175,6 +180,7 @@ public actor VesselObservationStore {
                 lifecycle: provisional.lifecycle,
                 health: provisional.health,
                 updatedAt: provisional.updatedAt)
+            providerRegistrationIDs[durableDescriptor.id] = UUID()
         }
 
         for observationID in Array(candidates.keys) {
@@ -195,6 +201,15 @@ public actor VesselObservationStore {
             candidates[observationID] = byProvider
         }
         providers.removeValue(forKey: provisionalID)
+        providerRegistrationIDs.removeValue(forKey: provisionalID)
+    }
+
+    /// Opaque process-local registration identity for dependent projection caches.
+    /// Health/presence updates preserve identity; removal and new registration do not.
+    public func providerRegistrations(requiringAvailability: Bool = false) -> [ProviderID: UUID] {
+        providerRegistrationIDs.filter { id, _ in
+            !requiringAvailability || providers[id]?.availability == .available
+        }
     }
 
     public func providerState(_ id: ProviderID) -> ProviderState? { providers[id] }

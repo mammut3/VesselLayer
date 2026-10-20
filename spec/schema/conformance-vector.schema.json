@@ -3,34 +3,119 @@
   "$id": "https://vessellayer.org/schema/0.1.0/conformance-vector.schema.json",
   "title": "VesselLayer read-authority conformance vectors",
   "type": "object",
-  "required": ["schemaVersion", "vectors"],
+  "required": [
+    "schemaVersion",
+    "vectors"
+  ],
   "properties": {
-    "schemaVersion": {"const": "0.1.0"},
-    "vectors": {"type":"array", "items":{"$ref":"#/$defs/vector"}}
+    "schemaVersion": {
+      "const": "0.1.0"
+    },
+    "vectors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/vector"
+      }
+    }
   },
   "$defs": {
     "vector": {
-      "type":"object", "required":["id","events","policy","expectedReason"],
+      "type": "object",
+      "required": [
+        "id",
+        "events",
+        "policy",
+        "expectedReason"
+      ],
       "properties": {
-        "id":{"type":"string","minLength":1},
-        "events":{"type":"array","items":{"$ref":"#/$defs/event"}},
-        "policy":{"$ref":"#/$defs/policy"},
-        "expectedProviderID":{"type":["string","null"]},
-        "expectedReason":{"enum":["onlyEligible","policyRank","quality","stableProviderID","noRegisteredCandidates","noEligibleCandidates"]}
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/event"
+          }
+        },
+        "policy": {
+          "$ref": "#/$defs/policy"
+        },
+        "expectedProviderID": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "expectedReason": {
+          "enum": [
+            "onlyEligible",
+            "policyRank",
+            "quality",
+            "stableProviderID",
+            "noRegisteredCandidates",
+            "noEligibleCandidates"
+          ]
+        },
+        "expectedValue": {
+          "type": "number"
+        }
       }
     },
     "event": {
-      "type":"object", "required":["type"],
+      "type": "object",
+      "required": [
+        "type"
+      ],
       "properties": {
-        "type":{"enum":["register","present","unavailable","withdraw","remove","reconcile","observe","advance"]},
-        "providerID":{"type":"string"}, "targetProviderID":{"type":"string"}, "seconds":{"type":"integer","minimum":0}, "value":{"type":"number"}
+        "type": {
+          "enum": [
+            "register",
+            "present",
+            "unavailable",
+            "withdraw",
+            "remove",
+            "reconcile",
+            "observe",
+            "advance"
+          ]
+        },
+        "providerID": {
+          "type": "string"
+        },
+        "targetProviderID": {
+          "type": "string"
+        },
+        "seconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "value": {
+          "type": "number"
+        },
+        "receivedAtSeconds": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
     "policy": {
-      "type":"object", "required":["freshForSeconds","providerRanks"],
+      "type": "object",
+      "required": [
+        "freshForSeconds",
+        "providerRanks"
+      ],
       "properties": {
-        "freshForSeconds":{"type":"integer","minimum":0},
-        "providerRanks":{"type":"object","additionalProperties":{"type":"integer"}}
+        "freshForSeconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "providerRanks": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer"
+          }
+        }
       }
     }
   }
