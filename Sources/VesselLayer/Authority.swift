@@ -140,6 +140,7 @@ public actor VesselObservationStore {
     public func updateProvider(_ id: ProviderID, lifecycle: ProviderLifecycle, health: ProviderHealth) async {
         // Clock reads can suspend. Inspect terminal lifecycle only after that hop,
         // with no suspension between the final check and mutation.
+        guard providers[id] != nil else { return }
         let update = UUID()
         providerAvailabilityUpdates[id] = update
         let now = await clock.now()
@@ -311,6 +312,21 @@ public actor VesselObservationStore {
             candidates[id]?[providerID] = current
         }
         return true
+    }
+
+    /// Reclaim validity boundaries only after the adapter has permanently closed
+    /// the matching stream/session. This does not restore retired measurements.
+    @discardableResult public func discardInvalidations(for providerID: ProviderID,
+                                                        matchingAttributes: [String: String]) -> Int {
+        var removed = 0
+        for id in Array(invalidations.keys) {
+            let before = invalidations[id]?[providerID]?.count ?? 0
+            invalidations[id]?[providerID]?.removeAll { event in
+                matchingAttributes.allSatisfy { event.source.attributes[$0.key] == $0.value }
+            }
+            removed += before - (invalidations[id]?[providerID]?.count ?? 0)
+        }
+        return removed
     }
 
     private func retainInvalidation(_ event: Invalidation, for id: ObservationID, providerID: ProviderID) {

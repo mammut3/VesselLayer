@@ -332,6 +332,40 @@
       },
       "expectedProviderID": null,
       "expectedReason": "noRegisteredCandidates"
+    },
+    {
+      "id": "closed-stream-cleanup-does-not-restore-measurement",
+      "events": [
+        {
+          "type": "register",
+          "providerID": "a"
+        },
+        {
+          "type": "present",
+          "providerID": "a"
+        },
+        {
+          "type": "observe",
+          "providerID": "a",
+          "receivedAtSeconds": 1,
+          "value": 1
+        },
+        {
+          "type": "invalidate",
+          "providerID": "a",
+          "receivedAtSeconds": 2
+        },
+        {
+          "type": "closeValidityStream",
+          "providerID": "a"
+        }
+      ],
+      "policy": {
+        "freshForSeconds": 5,
+        "providerRanks": {}
+      },
+      "expectedProviderID": null,
+      "expectedReason": "noEligibleCandidates"
     }
   ]
 }

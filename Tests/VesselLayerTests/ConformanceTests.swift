@@ -38,6 +38,8 @@ private struct Policy: Decodable { let freshForSeconds: UInt64; let providerRank
             case "reconcile":
                 let target = event.targetProviderID ?? ""
                 await store.reconcileProvider(from: id, to: TestProviders.descriptor(target))
+            case "closeValidityStream":
+                await store.discardInvalidations(for: id, matchingAttributes: [:])
             case "invalidate":
                 let now = await clock.now()
                 await store.invalidate(.navigationHeading, from: .init(providerID: id),

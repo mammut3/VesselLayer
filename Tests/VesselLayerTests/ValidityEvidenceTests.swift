@@ -68,6 +68,20 @@ struct ValidityEvidenceTests {
         #expect(await store.ingest(sample(durable.id, at: 24, stream: "b")))
     }
 
+    @Test func closedStreamCleanupKeepsRetiredDiagnosticsAndOtherBoundaries() async {
+        let store = VesselObservationStore(clock: ManualClock())
+        await store.register(descriptor)
+        let old = sample(descriptor.id, at: 10)
+        await store.ingest(old)
+        await store.invalidate(.navigationHeading, from: old.source, at: .init(nanoseconds: 20), matchingAttributes: ["stream": "a"])
+        await store.invalidate(.navigationHeading, from: sample(descriptor.id, at: 22, stream: "b").source,
+                               at: .init(nanoseconds: 22), matchingAttributes: ["stream": "b"])
+        #expect(await store.discardInvalidations(for: descriptor.id, matchingAttributes: ["stream": "a"]) == 1)
+        #expect(await store.allCandidates(for: .navigationHeading).first?.validity == .unavailable)
+        #expect(await store.ingest(sample(descriptor.id, at: 21, stream: "b")) == false)
+        #expect(await store.discardInvalidations(for: descriptor.id, matchingAttributes: ["stream": "a"]) == 0)
+    }
+
     @Test func repeatedRetirementCannotReplaceNewStreamNegativeBoundary() async {
         let store = VesselObservationStore(clock: ManualClock())
         await store.register(descriptor)

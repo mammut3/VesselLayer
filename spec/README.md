@@ -47,3 +47,7 @@ identity reconciliation. A foreign-stream negative does not retire a current
 reading, but must still reject an older measurement if that stream later becomes
 the identified source. New measurements prune boundaries older than their receipt;
 multiple negatives in one scope retain only the newest boundary.
+
+An adapter may discard a permanently closed stream's validity boundaries after
+it prevents that stream/session from re-entering. Cleanup does not restore the
+retired diagnostic measurement and must preserve other streams' boundaries.

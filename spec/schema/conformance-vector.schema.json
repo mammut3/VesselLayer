@@ -78,7 +78,8 @@
             "reconcile",
             "observe",
             "advance",
-            "invalidate"
+            "invalidate",
+            "closeValidityStream"
           ]
         },
         "providerID": {
