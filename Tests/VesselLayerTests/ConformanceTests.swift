@@ -10,8 +10,9 @@ private struct Vector: Decodable {
     let policy: Policy
     let expectedProviderID: String?
     let expectedReason: String
+    let expectedValue: Double?
 }
-private struct Event: Decodable { let type: String; let providerID: String?; let targetProviderID: String?; let seconds: UInt64?; let value: Double? }
+private struct Event: Decodable { let type: String; let providerID: String?; let targetProviderID: String?; let seconds: UInt64?; let value: Double?; let receivedAtSeconds: UInt64? }
 private struct Policy: Decodable { let freshForSeconds: UInt64; let providerRanks: [String: Int] }
 
 @Test func publicTechnologyNeutralAuthorityVectors() async throws {
@@ -37,10 +38,18 @@ private struct Policy: Decodable { let freshForSeconds: UInt64; let providerRank
             case "reconcile":
                 let target = event.targetProviderID ?? ""
                 await store.reconcileProvider(from: id, to: TestProviders.descriptor(target))
+            case "closeValidityStream":
+                await store.discardInvalidations(for: id, matchingAttributes: [:])
+            case "invalidate":
+                let now = await clock.now()
+                await store.invalidate(.navigationHeading, from: .init(providerID: id),
+                    at: event.receivedAtSeconds.map { .init(nanoseconds: $0 * 1_000_000_000) } ?? now,
+                    matchingAttributes: [:])
             case "observe":
+                let now = await clock.now()
                 await store.ingest(AnyObservation(id: .navigationHeading,
                     value: .heading(.init(radians: event.value ?? 0, reference: .trueNorth)),
-                    source: .init(providerID: id), receivedAt: await clock.now()))
+                    source: .init(providerID: id), receivedAt: event.receivedAtSeconds.map { .init(nanoseconds: $0 * 1_000_000_000) } ?? now))
             default: Issue.record("Unknown event \(event.type)")
             }
         }
@@ -48,6 +57,9 @@ private struct Policy: Decodable { let freshForSeconds: UInt64; let providerRank
         let decision = await store.authority(for: .navigationHeading,
             policy: .init(providerRanks: ranks, freshness: .init(freshForNanoseconds: vector.policy.freshForSeconds * 1_000_000_000)))
         #expect(decision.observation?.source.providerID.rawValue == vector.expectedProviderID, "vector: \(vector.id)")
+        if let expected = vector.expectedValue, case let .heading(value) = decision.observation?.value {
+            #expect(value.radians == expected, "vector: \(vector.id)")
+        }
         let reason: String
         switch decision.reason {
         case .selectedOnlyEligibleCandidate: reason = "onlyEligible"

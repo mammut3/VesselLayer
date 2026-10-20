@@ -1,3 +1,5 @@
+import Foundation
+
 public struct ReadAuthorityPolicy: Hashable, Codable, Sendable {
     /// Lower values are preferred. Unlisted providers share the default rank.
     public var providerRanks: [ProviderID: Int]
@@ -110,7 +112,19 @@ public struct DataSourceMapEntry: Hashable, Codable, Sendable {
 public actor VesselObservationStore {
     private let clock: any VesselLayerClock
     private var providers: [ProviderID: ProviderState] = [:]
+    private var providerRegistrationIDs: [ProviderID: UUID] = [:]
+    private var providerAvailabilityUpdates: [ProviderID: UUID] = [:]
     private var candidates: [ObservationID: [ProviderID: AnyObservation]] = [:]
+
+    private struct Invalidation {
+        var source: ObservationSource
+        var receivedAt: MonotonicInstant
+        var matchingAttributes: [String: String]
+        func matches(_ source: ObservationSource) -> Bool {
+            matchingAttributes.allSatisfy { source.attributes[$0.key] == $0.value }
+        }
+    }
+    private var invalidations: [ObservationID: [ProviderID: [Invalidation]]] = [:]
 
     public init(clock: any VesselLayerClock) { self.clock = clock }
 
@@ -119,14 +133,19 @@ public actor VesselObservationStore {
         if let existing = providers[descriptor.id] { return existing }
         let state = ProviderState(descriptor: descriptor, updatedAt: now)
         providers[descriptor.id] = state
+        providerRegistrationIDs[descriptor.id] = UUID()
         return state
     }
 
     public func updateProvider(_ id: ProviderID, lifecycle: ProviderLifecycle, health: ProviderHealth) async {
         // Clock reads can suspend. Inspect terminal lifecycle only after that hop,
         // with no suspension between the final check and mutation.
+        guard providers[id] != nil else { return }
+        let update = UUID()
+        providerAvailabilityUpdates[id] = update
         let now = await clock.now()
-        guard var state = providers[id], state.lifecycle != .withdrawn else { return }
+        guard providerAvailabilityUpdates[id] == update,
+              var state = providers[id], state.lifecycle != .withdrawn else { return }
         state.lifecycle = lifecycle; state.health = health; state.updatedAt = now; providers[id] = state
     }
 
@@ -141,6 +160,12 @@ public actor VesselObservationStore {
     /// removal for session-scoped identities that are no longer meaningful.
     public func removeProvider(_ id: ProviderID) {
         providers.removeValue(forKey: id)
+        providerRegistrationIDs.removeValue(forKey: id)
+        providerAvailabilityUpdates.removeValue(forKey: id)
+        for observationID in Array(invalidations.keys) {
+            invalidations[observationID]?.removeValue(forKey: id)
+            if invalidations[observationID]?.isEmpty == true { invalidations.removeValue(forKey: observationID) }
+        }
         for observationID in Array(candidates.keys) {
             candidates[observationID]?.removeValue(forKey: id)
             if candidates[observationID]?.isEmpty == true {
@@ -175,9 +200,18 @@ public actor VesselObservationStore {
                 lifecycle: provisional.lifecycle,
                 health: provisional.health,
                 updatedAt: provisional.updatedAt)
+            providerRegistrationIDs[durableDescriptor.id] = UUID()
         }
 
-        for observationID in Array(candidates.keys) {
+        // Migrate validity evidence even when no numeric observation preceded it.
+        for observationID in Set(candidates.keys).union(invalidations.keys) {
+            if let events = invalidations[observationID]?.removeValue(forKey: provisionalID) {
+                for var event in events {
+                    event.source.providerID = durableDescriptor.id
+                    event.source.assetID = durableDescriptor.assetID
+                    retainInvalidation(event, for: observationID, providerID: durableDescriptor.id)
+                }
+            }
             guard var byProvider = candidates[observationID],
                   var provisionalObservation = byProvider.removeValue(forKey: provisionalID)
             else { continue }
@@ -194,7 +228,31 @@ public actor VesselObservationStore {
             }
             candidates[observationID] = byProvider
         }
+        for observationID in Array(invalidations.keys) {
+            if let events = invalidations[observationID]?[durableDescriptor.id],
+               var observation = candidates[observationID]?[durableDescriptor.id] {
+                if events.contains(where: { $0.matches(observation.source) && $0.receivedAt.nanoseconds > observation.receivedAt.nanoseconds }) {
+                    observation.validity = .unavailable
+                    candidates[observationID]?[durableDescriptor.id] = observation
+                }
+                // Keep foreign-stream negatives through a late identity handover;
+                // they do not retire this reading but still order their own stream.
+                invalidations[observationID]?[durableDescriptor.id]?.removeAll {
+                    $0.receivedAt.nanoseconds < observation.receivedAt.nanoseconds
+                }
+            }
+        }
         providers.removeValue(forKey: provisionalID)
+        providerRegistrationIDs.removeValue(forKey: provisionalID)
+        providerAvailabilityUpdates.removeValue(forKey: provisionalID)
+    }
+
+    /// Opaque process-local registration identity for dependent projection caches.
+    /// Health/presence updates preserve identity; removal and new registration do not.
+    public func providerRegistrations(requiringAvailability: Bool = false) -> [ProviderID: UUID] {
+        providerRegistrationIDs.filter { id, _ in
+            !requiringAvailability || providers[id]?.availability == .available
+        }
     }
 
     public func providerState(_ id: ProviderID) -> ProviderState? { providers[id] }
@@ -203,9 +261,81 @@ public actor VesselObservationStore {
         providers.values.sorted { $0.descriptor.id < $1.descriptor.id }
     }
 
-    public func ingest(_ observation: AnyObservation) {
-        guard providers[observation.source.providerID] != nil else { return }
-        candidates[observation.id, default: [:]][observation.source.providerID] = observation
+    @discardableResult public func ingest(_ observation: AnyObservation) -> Bool {
+        let providerID = observation.source.providerID
+        guard providers[providerID] != nil else { return false }
+        if invalidations[observation.id]?[providerID]?.contains(where: {
+            $0.matches(observation.source) && observation.receivedAt.nanoseconds <= $0.receivedAt.nanoseconds
+        }) == true { return false }
+        // A completed multi-part observation retains its original receipt time.
+        // Equal timestamps retain arrival-order replacement, including invalidation.
+        if let current = candidates[observation.id]?[observation.source.providerID],
+           current.receivedAt.nanoseconds > observation.receivedAt.nanoseconds { return false }
+        invalidations[observation.id]?[providerID]?.removeAll { $0.receivedAt.nanoseconds < observation.receivedAt.nanoseconds }
+        candidates[observation.id, default: [:]][providerID] = observation
+        return true
+    }
+
+    /// Ordered field-validity evidence without a fabricated measurement. The
+    /// adapter supplies the source/session attributes that must match. A negative
+    /// must be strictly newer; nil time retires the current matching reading at
+    /// its existing evidence boundary (for source/session disappearance).
+    /// Last measured value, provenance and receipt time remain diagnostic only.
+    @discardableResult public func invalidate(_ id: ObservationID, from source: ObservationSource,
+                                              at receivedAt: MonotonicInstant?,
+                                              matchingAttributes: [String: String]) -> Bool {
+        let providerID = source.providerID
+        guard providers[providerID] != nil else { return false }
+        let current = candidates[id]?[providerID]
+        let previous = invalidations[id]?[providerID]?.filter { $0.matchingAttributes == matchingAttributes }
+            .max { $0.receivedAt.nanoseconds < $1.receivedAt.nanoseconds }
+        func matches(_ candidate: ObservationSource) -> Bool {
+            matchingAttributes.allSatisfy { candidate.attributes[$0.key] == $0.value }
+        }
+        // An already retired diagnostic from another stream must not prevent a
+        // replacement stream from establishing its own negative-only boundary.
+        if let current, current.validity == .valid, !matches(current.source) { return false }
+        let latest = max(current?.receivedAt.nanoseconds ?? 0, previous?.receivedAt.nanoseconds ?? 0)
+        let stamp: MonotonicInstant
+        if let receivedAt {
+            guard (current == nil && previous == nil) || receivedAt.nanoseconds > latest else { return false }
+            stamp = receivedAt
+        } else {
+            // Lifecycle retirement is a compare-and-set of the captured reading.
+            guard let current, current.validity == .valid, current.source == source else { return false }
+            stamp = .init(nanoseconds: latest)
+        }
+        retainInvalidation(.init(source: source, receivedAt: stamp, matchingAttributes: matchingAttributes),
+                           for: id, providerID: providerID)
+        if var current {
+            current.validity = .unavailable
+            candidates[id]?[providerID] = current
+        }
+        return true
+    }
+
+    /// Reclaim validity boundaries only after the adapter has permanently closed
+    /// the matching stream/session. This does not restore retired measurements.
+    @discardableResult public func discardInvalidations(for providerID: ProviderID,
+                                                        matchingAttributes: [String: String]) -> Int {
+        var removed = 0
+        for id in Array(invalidations.keys) {
+            let before = invalidations[id]?[providerID]?.count ?? 0
+            invalidations[id]?[providerID]?.removeAll { event in
+                matchingAttributes.allSatisfy { event.source.attributes[$0.key] == $0.value }
+            }
+            removed += before - (invalidations[id]?[providerID]?.count ?? 0)
+        }
+        return removed
+    }
+
+    private func retainInvalidation(_ event: Invalidation, for id: ObservationID, providerID: ProviderID) {
+        var events = invalidations[id]?[providerID] ?? []
+        if let index = events.firstIndex(where: { $0.matchingAttributes == event.matchingAttributes }) {
+            guard event.receivedAt.nanoseconds > events[index].receivedAt.nanoseconds else { return }
+            events[index] = event
+        } else { events.append(event) }
+        invalidations[id, default: [:]][providerID] = events
     }
 
     public func allCandidates(for id: ObservationID) -> [AnyObservation] {
@@ -213,10 +343,16 @@ public actor VesselObservationStore {
     }
 
     public func authority(for id: ObservationID, policy: ReadAuthorityPolicy) async -> AuthorityDecision {
+        let now = await clock.now()
+        return authoritySnapshot(for: id, policy: policy, at: now)
+    }
+
+    /// Selection and row construction run without actor suspension after the clock.
+    private func authoritySnapshot(for id: ObservationID, policy: ReadAuthorityPolicy,
+                                   at now: MonotonicInstant) -> AuthorityDecision {
         guard let registered = candidates[id], !registered.isEmpty else {
             return AuthorityDecision(observation: nil, reason: .noRegisteredCandidates, eligibleProviderIDs: [])
         }
-        let now = await clock.now()
         let eligible = registered.values.filter { observation in
             guard observation.validity == .valid,
                   observation.freshness(at: now, policy: policy.freshness) == .fresh,
@@ -250,9 +386,14 @@ public actor VesselObservationStore {
 
     public func sourceMapEntry(for id: ObservationID,
                                policy: ReadAuthorityPolicy) async -> DataSourceMapEntry {
-        let decision = await authority(for: id, policy: policy)
-        let authoritativeID = decision.observation?.source.providerID
         let now = await clock.now()
+        return sourceMapSnapshot(for: id, policy: policy, at: now)
+    }
+
+    private func sourceMapSnapshot(for id: ObservationID, policy: ReadAuthorityPolicy,
+                                   at now: MonotonicInstant) -> DataSourceMapEntry {
+        let decision = authoritySnapshot(for: id, policy: policy, at: now)
+        let authoritativeID = decision.observation?.source.providerID
         let sourceCandidates = candidates[id, default: [:]].values.compactMap { observation -> SourceCandidate? in
             guard let provider = providers[observation.source.providerID] else { return nil }
             return SourceCandidate(
@@ -271,7 +412,8 @@ public actor VesselObservationStore {
 
     public func readCapability(for observationID: ObservationID, id capabilityID: CapabilityID,
                                policy: ReadAuthorityPolicy) async -> CapabilityState {
-        let map = await sourceMapEntry(for: observationID, policy: policy)
+        let now = await clock.now()
+        let map = sourceMapSnapshot(for: observationID, policy: policy, at: now)
         let declaredProviderIDs = providers.values
             .filter { $0.descriptor.observationIDs.contains(observationID) }
             .map { $0.descriptor.id }
