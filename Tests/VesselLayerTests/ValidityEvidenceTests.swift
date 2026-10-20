@@ -53,6 +53,21 @@ struct ValidityEvidenceTests {
         #expect(await store.allCandidates(for: .navigationHeading).first?.validity == .valid)
         #expect(await store.ingest(sample(durable.id, at: 11, stream: "b")))
     }
+    @Test func lateIdentityHandoverKeepsForeignStreamNegativeWithoutRetiringCurrentStream() async {
+        let store = VesselObservationStore(clock: ManualClock())
+        let durable = TestProviders.descriptor("durable")
+        await store.register(descriptor); await store.register(durable)
+        let old = sample(durable.id, at: 10, stream: "a")
+        await store.ingest(old)
+        await store.invalidate(.navigationHeading, from: sample(descriptor.id, at: 22, stream: "b").source,
+                               at: .init(nanoseconds: 22), matchingAttributes: ["stream": "b"])
+        await store.reconcileProvider(from: descriptor.id, to: durable)
+        #expect(await store.allCandidates(for: .navigationHeading).first?.validity == .valid)
+        await store.invalidate(.navigationHeading, from: old.source, at: .init(nanoseconds: 23), matchingAttributes: ["stream": "a"])
+        #expect(await store.ingest(sample(durable.id, at: 21, stream: "b")) == false)
+        #expect(await store.ingest(sample(durable.id, at: 24, stream: "b")))
+    }
+
     @Test func repeatedRetirementCannotReplaceNewStreamNegativeBoundary() async {
         let store = VesselObservationStore(clock: ManualClock())
         await store.register(descriptor)

@@ -41,3 +41,9 @@ These rules do not infer command authority or change other fields' retention.
 A suspended provider availability update cannot overwrite a newer requested
 availability update for that provider. Removal clears pending update ownership;
 an older completion cannot mutate a later registration of the same identifier.
+
+Validity boundaries are retained per adapter-supplied stream scope through
+identity reconciliation. A foreign-stream negative does not retire a current
+reading, but must still reject an older measurement if that stream later becomes
+the identified source. New measurements prune boundaries older than their receipt;
+multiple negatives in one scope retain only the newest boundary.

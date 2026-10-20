@@ -124,7 +124,7 @@ public actor VesselObservationStore {
             matchingAttributes.allSatisfy { source.attributes[$0.key] == $0.value }
         }
     }
-    private var invalidations: [ObservationID: [ProviderID: Invalidation]] = [:]
+    private var invalidations: [ObservationID: [ProviderID: [Invalidation]]] = [:]
 
     public init(clock: any VesselLayerClock) { self.clock = clock }
 
@@ -204,11 +204,11 @@ public actor VesselObservationStore {
 
         // Migrate validity evidence even when no numeric observation preceded it.
         for observationID in Set(candidates.keys).union(invalidations.keys) {
-            if var event = invalidations[observationID]?.removeValue(forKey: provisionalID) {
-                event.source.providerID = durableDescriptor.id
-                event.source.assetID = durableDescriptor.assetID
-                if event.receivedAt.nanoseconds > (invalidations[observationID]?[durableDescriptor.id]?.receivedAt.nanoseconds ?? 0) || invalidations[observationID]?[durableDescriptor.id] == nil {
-                    invalidations[observationID, default: [:]][durableDescriptor.id] = event
+            if let events = invalidations[observationID]?.removeValue(forKey: provisionalID) {
+                for var event in events {
+                    event.source.providerID = durableDescriptor.id
+                    event.source.assetID = durableDescriptor.assetID
+                    retainInvalidation(event, for: observationID, providerID: durableDescriptor.id)
                 }
             }
             guard var byProvider = candidates[observationID],
@@ -228,14 +228,17 @@ public actor VesselObservationStore {
             candidates[observationID] = byProvider
         }
         for observationID in Array(invalidations.keys) {
-            if let event = invalidations[observationID]?[durableDescriptor.id],
+            if let events = invalidations[observationID]?[durableDescriptor.id],
                var observation = candidates[observationID]?[durableDescriptor.id] {
-                if !event.matches(observation.source) {
-                    invalidations[observationID]?.removeValue(forKey: durableDescriptor.id)
-                } else if event.receivedAt.nanoseconds >= observation.receivedAt.nanoseconds {
+                if events.contains(where: { $0.matches(observation.source) && $0.receivedAt.nanoseconds > observation.receivedAt.nanoseconds }) {
                     observation.validity = .unavailable
                     candidates[observationID]?[durableDescriptor.id] = observation
-                } else { invalidations[observationID]?.removeValue(forKey: durableDescriptor.id) }
+                }
+                // Keep foreign-stream negatives through a late identity handover;
+                // they do not retire this reading but still order their own stream.
+                invalidations[observationID]?[durableDescriptor.id]?.removeAll {
+                    $0.receivedAt.nanoseconds < observation.receivedAt.nanoseconds
+                }
             }
         }
         providers.removeValue(forKey: provisionalID)
@@ -260,13 +263,14 @@ public actor VesselObservationStore {
     @discardableResult public func ingest(_ observation: AnyObservation) -> Bool {
         let providerID = observation.source.providerID
         guard providers[providerID] != nil else { return false }
-        if let event = invalidations[observation.id]?[providerID], event.matches(observation.source),
-           observation.receivedAt.nanoseconds <= event.receivedAt.nanoseconds { return false }
+        if invalidations[observation.id]?[providerID]?.contains(where: {
+            $0.matches(observation.source) && observation.receivedAt.nanoseconds <= $0.receivedAt.nanoseconds
+        }) == true { return false }
         // A completed multi-part observation retains its original receipt time.
         // Equal timestamps retain arrival-order replacement, including invalidation.
         if let current = candidates[observation.id]?[observation.source.providerID],
            current.receivedAt.nanoseconds > observation.receivedAt.nanoseconds { return false }
-        invalidations[observation.id]?.removeValue(forKey: providerID)
+        invalidations[observation.id]?[providerID]?.removeAll { $0.receivedAt.nanoseconds < observation.receivedAt.nanoseconds }
         candidates[observation.id, default: [:]][providerID] = observation
         return true
     }
@@ -282,7 +286,8 @@ public actor VesselObservationStore {
         let providerID = source.providerID
         guard providers[providerID] != nil else { return false }
         let current = candidates[id]?[providerID]
-        let previous = invalidations[id]?[providerID]
+        let previous = invalidations[id]?[providerID]?.filter { $0.matchingAttributes == matchingAttributes }
+            .max { $0.receivedAt.nanoseconds < $1.receivedAt.nanoseconds }
         func matches(_ candidate: ObservationSource) -> Bool {
             matchingAttributes.allSatisfy { candidate.attributes[$0.key] == $0.value }
         }
@@ -299,12 +304,22 @@ public actor VesselObservationStore {
             guard let current, current.validity == .valid, current.source == source else { return false }
             stamp = .init(nanoseconds: latest)
         }
-        invalidations[id, default: [:]][providerID] = .init(source: source, receivedAt: stamp, matchingAttributes: matchingAttributes)
+        retainInvalidation(.init(source: source, receivedAt: stamp, matchingAttributes: matchingAttributes),
+                           for: id, providerID: providerID)
         if var current {
             current.validity = .unavailable
             candidates[id]?[providerID] = current
         }
         return true
+    }
+
+    private func retainInvalidation(_ event: Invalidation, for id: ObservationID, providerID: ProviderID) {
+        var events = invalidations[id]?[providerID] ?? []
+        if let index = events.firstIndex(where: { $0.matchingAttributes == event.matchingAttributes }) {
+            guard event.receivedAt.nanoseconds > events[index].receivedAt.nanoseconds else { return }
+            events[index] = event
+        } else { events.append(event) }
+        invalidations[id, default: [:]][providerID] = events
     }
 
     public func allCandidates(for id: ObservationID) -> [AnyObservation] {
