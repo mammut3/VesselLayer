@@ -205,6 +205,10 @@ public actor VesselObservationStore {
 
     public func ingest(_ observation: AnyObservation) {
         guard providers[observation.source.providerID] != nil else { return }
+        // A completed multi-part observation retains its original receipt time.
+        // Equal timestamps retain arrival-order replacement, including invalidation.
+        if let current = candidates[observation.id]?[observation.source.providerID],
+           current.receivedAt.nanoseconds > observation.receivedAt.nanoseconds { return }
         candidates[observation.id, default: [:]][observation.source.providerID] = observation
     }
 
@@ -213,10 +217,16 @@ public actor VesselObservationStore {
     }
 
     public func authority(for id: ObservationID, policy: ReadAuthorityPolicy) async -> AuthorityDecision {
+        let now = await clock.now()
+        return authoritySnapshot(for: id, policy: policy, at: now)
+    }
+
+    /// Selection and row construction run without actor suspension after the clock.
+    private func authoritySnapshot(for id: ObservationID, policy: ReadAuthorityPolicy,
+                                   at now: MonotonicInstant) -> AuthorityDecision {
         guard let registered = candidates[id], !registered.isEmpty else {
             return AuthorityDecision(observation: nil, reason: .noRegisteredCandidates, eligibleProviderIDs: [])
         }
-        let now = await clock.now()
         let eligible = registered.values.filter { observation in
             guard observation.validity == .valid,
                   observation.freshness(at: now, policy: policy.freshness) == .fresh,
@@ -250,9 +260,14 @@ public actor VesselObservationStore {
 
     public func sourceMapEntry(for id: ObservationID,
                                policy: ReadAuthorityPolicy) async -> DataSourceMapEntry {
-        let decision = await authority(for: id, policy: policy)
-        let authoritativeID = decision.observation?.source.providerID
         let now = await clock.now()
+        return sourceMapSnapshot(for: id, policy: policy, at: now)
+    }
+
+    private func sourceMapSnapshot(for id: ObservationID, policy: ReadAuthorityPolicy,
+                                   at now: MonotonicInstant) -> DataSourceMapEntry {
+        let decision = authoritySnapshot(for: id, policy: policy, at: now)
+        let authoritativeID = decision.observation?.source.providerID
         let sourceCandidates = candidates[id, default: [:]].values.compactMap { observation -> SourceCandidate? in
             guard let provider = providers[observation.source.providerID] else { return nil }
             return SourceCandidate(
@@ -271,7 +286,8 @@ public actor VesselObservationStore {
 
     public func readCapability(for observationID: ObservationID, id capabilityID: CapabilityID,
                                policy: ReadAuthorityPolicy) async -> CapabilityState {
-        let map = await sourceMapEntry(for: observationID, policy: policy)
+        let now = await clock.now()
+        let map = sourceMapSnapshot(for: observationID, policy: policy, at: now)
         let declaredProviderIDs = providers.values
             .filter { $0.descriptor.observationIDs.contains(observationID) }
             .map { $0.descriptor.id }
