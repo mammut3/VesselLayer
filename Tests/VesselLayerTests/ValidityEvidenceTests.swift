@@ -53,6 +53,19 @@ struct ValidityEvidenceTests {
         #expect(await store.allCandidates(for: .navigationHeading).first?.validity == .valid)
         #expect(await store.ingest(sample(durable.id, at: 11, stream: "b")))
     }
+    @Test func repeatedRetirementCannotReplaceNewStreamNegativeBoundary() async {
+        let store = VesselObservationStore(clock: ManualClock())
+        await store.register(descriptor)
+        let old = sample(descriptor.id, at: 10)
+        await store.ingest(old)
+        await store.invalidate(.navigationHeading, from: old.source, at: nil, matchingAttributes: ["stream": "a"])
+        await store.invalidate(.navigationHeading, from: sample(descriptor.id, at: 22, stream: "b").source,
+                               at: .init(nanoseconds: 22), matchingAttributes: ["stream": "b"])
+        #expect(await store.invalidate(.navigationHeading, from: old.source, at: nil, matchingAttributes: ["stream": "a"]) == false)
+        #expect(await store.ingest(sample(descriptor.id, at: 21, stream: "b")) == false)
+        #expect(await store.ingest(sample(descriptor.id, at: 23, stream: "b")))
+    }
+
     @Test func lifecycleRetirementCannotRetireMeasurementPublishedAfterCapture() async {
         let store = VesselObservationStore(clock: ManualClock())
         await store.register(descriptor)

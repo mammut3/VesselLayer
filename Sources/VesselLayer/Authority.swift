@@ -113,6 +113,7 @@ public actor VesselObservationStore {
     private let clock: any VesselLayerClock
     private var providers: [ProviderID: ProviderState] = [:]
     private var providerRegistrationIDs: [ProviderID: UUID] = [:]
+    private var providerAvailabilityUpdates: [ProviderID: UUID] = [:]
     private var candidates: [ObservationID: [ProviderID: AnyObservation]] = [:]
 
     private struct Invalidation {
@@ -139,8 +140,11 @@ public actor VesselObservationStore {
     public func updateProvider(_ id: ProviderID, lifecycle: ProviderLifecycle, health: ProviderHealth) async {
         // Clock reads can suspend. Inspect terminal lifecycle only after that hop,
         // with no suspension between the final check and mutation.
+        let update = UUID()
+        providerAvailabilityUpdates[id] = update
         let now = await clock.now()
-        guard var state = providers[id], state.lifecycle != .withdrawn else { return }
+        guard providerAvailabilityUpdates[id] == update,
+              var state = providers[id], state.lifecycle != .withdrawn else { return }
         state.lifecycle = lifecycle; state.health = health; state.updatedAt = now; providers[id] = state
     }
 
@@ -156,6 +160,7 @@ public actor VesselObservationStore {
     public func removeProvider(_ id: ProviderID) {
         providers.removeValue(forKey: id)
         providerRegistrationIDs.removeValue(forKey: id)
+        providerAvailabilityUpdates.removeValue(forKey: id)
         for observationID in Array(invalidations.keys) {
             invalidations[observationID]?.removeValue(forKey: id)
             if invalidations[observationID]?.isEmpty == true { invalidations.removeValue(forKey: observationID) }
@@ -235,6 +240,7 @@ public actor VesselObservationStore {
         }
         providers.removeValue(forKey: provisionalID)
         providerRegistrationIDs.removeValue(forKey: provisionalID)
+        providerAvailabilityUpdates.removeValue(forKey: provisionalID)
     }
 
     /// Opaque process-local registration identity for dependent projection caches.
@@ -290,7 +296,7 @@ public actor VesselObservationStore {
             stamp = receivedAt
         } else {
             // Lifecycle retirement is a compare-and-set of the captured reading.
-            guard let current, current.source == source else { return false }
+            guard let current, current.validity == .valid, current.source == source else { return false }
             stamp = .init(nanoseconds: latest)
         }
         invalidations[id, default: [:]][providerID] = .init(source: source, receivedAt: stamp, matchingAttributes: matchingAttributes)

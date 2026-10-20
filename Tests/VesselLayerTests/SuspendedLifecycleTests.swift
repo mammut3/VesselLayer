@@ -31,6 +31,20 @@ import Testing
         }
     }
 
+    @Test(arguments: [false, true]) func olderAvailabilityCompletionCannotOverwriteNewerIntent(reregister: Bool) async throws {
+        let clock = HeldLifecycleClock()
+        let store = VesselObservationStore(clock: clock)
+        let descriptor = ProviderDescriptor(id: .init(rawValue: "provider"), vesselID: .init(rawValue: "vessel"), label: "Provider")
+        await store.register(descriptor)
+        await clock.arm()
+        let old = Task { await store.updateProvider(descriptor.id, lifecycle: .unavailable, health: .unhealthy) }
+        try await clock.waitUntilHeld()
+        if reregister { await store.removeProvider(descriptor.id); await store.register(descriptor) }
+        await store.updateProvider(descriptor.id, lifecycle: .present, health: .healthy)
+        await clock.release(); await old.value
+        #expect(await store.providerState(descriptor.id)?.availability == .available)
+    }
+
     @Test func pendingWithdrawalCannotRestoreRemovedProvider() async throws {
         let clock = HeldLifecycleClock()
         // Use the same controlled clock at every production suspension.

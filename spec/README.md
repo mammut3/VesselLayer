@@ -37,3 +37,7 @@ including negative-only slots; removal clears them. Lifecycle retirement is an
 atomic compare-and-set of the captured reading and uses its existing evidence
 boundary, preventing unrelated provider reappearance from restoring that reading.
 These rules do not infer command authority or change other fields' retention.
+
+A suspended provider availability update cannot overwrite a newer requested
+availability update for that provider. Removal clears pending update ownership;
+an older completion cannot mutate a later registration of the same identifier.
