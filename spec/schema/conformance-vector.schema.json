@@ -77,7 +77,8 @@
             "remove",
             "reconcile",
             "observe",
-            "advance"
+            "advance",
+            "invalidate"
           ]
         },
         "providerID": {

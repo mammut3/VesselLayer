@@ -115,6 +115,16 @@ public actor VesselObservationStore {
     private var providerRegistrationIDs: [ProviderID: UUID] = [:]
     private var candidates: [ObservationID: [ProviderID: AnyObservation]] = [:]
 
+    private struct Invalidation {
+        var source: ObservationSource
+        var receivedAt: MonotonicInstant
+        var matchingAttributes: [String: String]
+        func matches(_ source: ObservationSource) -> Bool {
+            matchingAttributes.allSatisfy { source.attributes[$0.key] == $0.value }
+        }
+    }
+    private var invalidations: [ObservationID: [ProviderID: Invalidation]] = [:]
+
     public init(clock: any VesselLayerClock) { self.clock = clock }
 
     @discardableResult public func register(_ descriptor: ProviderDescriptor) async -> ProviderState {
@@ -146,6 +156,10 @@ public actor VesselObservationStore {
     public func removeProvider(_ id: ProviderID) {
         providers.removeValue(forKey: id)
         providerRegistrationIDs.removeValue(forKey: id)
+        for observationID in Array(invalidations.keys) {
+            invalidations[observationID]?.removeValue(forKey: id)
+            if invalidations[observationID]?.isEmpty == true { invalidations.removeValue(forKey: observationID) }
+        }
         for observationID in Array(candidates.keys) {
             candidates[observationID]?.removeValue(forKey: id)
             if candidates[observationID]?.isEmpty == true {
@@ -183,7 +197,15 @@ public actor VesselObservationStore {
             providerRegistrationIDs[durableDescriptor.id] = UUID()
         }
 
-        for observationID in Array(candidates.keys) {
+        // Migrate validity evidence even when no numeric observation preceded it.
+        for observationID in Set(candidates.keys).union(invalidations.keys) {
+            if var event = invalidations[observationID]?.removeValue(forKey: provisionalID) {
+                event.source.providerID = durableDescriptor.id
+                event.source.assetID = durableDescriptor.assetID
+                if event.receivedAt.nanoseconds > (invalidations[observationID]?[durableDescriptor.id]?.receivedAt.nanoseconds ?? 0) || invalidations[observationID]?[durableDescriptor.id] == nil {
+                    invalidations[observationID, default: [:]][durableDescriptor.id] = event
+                }
+            }
             guard var byProvider = candidates[observationID],
                   var provisionalObservation = byProvider.removeValue(forKey: provisionalID)
             else { continue }
@@ -199,6 +221,17 @@ public actor VesselObservationStore {
                 byProvider[durableDescriptor.id] = provisionalObservation
             }
             candidates[observationID] = byProvider
+        }
+        for observationID in Array(invalidations.keys) {
+            if let event = invalidations[observationID]?[durableDescriptor.id],
+               var observation = candidates[observationID]?[durableDescriptor.id] {
+                if !event.matches(observation.source) {
+                    invalidations[observationID]?.removeValue(forKey: durableDescriptor.id)
+                } else if event.receivedAt.nanoseconds >= observation.receivedAt.nanoseconds {
+                    observation.validity = .unavailable
+                    candidates[observationID]?[durableDescriptor.id] = observation
+                } else { invalidations[observationID]?.removeValue(forKey: durableDescriptor.id) }
+            }
         }
         providers.removeValue(forKey: provisionalID)
         providerRegistrationIDs.removeValue(forKey: provisionalID)
@@ -218,13 +251,54 @@ public actor VesselObservationStore {
         providers.values.sorted { $0.descriptor.id < $1.descriptor.id }
     }
 
-    public func ingest(_ observation: AnyObservation) {
-        guard providers[observation.source.providerID] != nil else { return }
+    @discardableResult public func ingest(_ observation: AnyObservation) -> Bool {
+        let providerID = observation.source.providerID
+        guard providers[providerID] != nil else { return false }
+        if let event = invalidations[observation.id]?[providerID], event.matches(observation.source),
+           observation.receivedAt.nanoseconds <= event.receivedAt.nanoseconds { return false }
         // A completed multi-part observation retains its original receipt time.
         // Equal timestamps retain arrival-order replacement, including invalidation.
         if let current = candidates[observation.id]?[observation.source.providerID],
-           current.receivedAt.nanoseconds > observation.receivedAt.nanoseconds { return }
-        candidates[observation.id, default: [:]][observation.source.providerID] = observation
+           current.receivedAt.nanoseconds > observation.receivedAt.nanoseconds { return false }
+        invalidations[observation.id]?.removeValue(forKey: providerID)
+        candidates[observation.id, default: [:]][providerID] = observation
+        return true
+    }
+
+    /// Ordered field-validity evidence without a fabricated measurement. The
+    /// adapter supplies the source/session attributes that must match. A negative
+    /// must be strictly newer; nil time retires the current matching reading at
+    /// its existing evidence boundary (for source/session disappearance).
+    /// Last measured value, provenance and receipt time remain diagnostic only.
+    @discardableResult public func invalidate(_ id: ObservationID, from source: ObservationSource,
+                                              at receivedAt: MonotonicInstant?,
+                                              matchingAttributes: [String: String]) -> Bool {
+        let providerID = source.providerID
+        guard providers[providerID] != nil else { return false }
+        let current = candidates[id]?[providerID]
+        let previous = invalidations[id]?[providerID]
+        func matches(_ candidate: ObservationSource) -> Bool {
+            matchingAttributes.allSatisfy { candidate.attributes[$0.key] == $0.value }
+        }
+        // An already retired diagnostic from another stream must not prevent a
+        // replacement stream from establishing its own negative-only boundary.
+        if let current, current.validity == .valid, !matches(current.source) { return false }
+        let latest = max(current?.receivedAt.nanoseconds ?? 0, previous?.receivedAt.nanoseconds ?? 0)
+        let stamp: MonotonicInstant
+        if let receivedAt {
+            guard (current == nil && previous == nil) || receivedAt.nanoseconds > latest else { return false }
+            stamp = receivedAt
+        } else {
+            // Lifecycle retirement is a compare-and-set of the captured reading.
+            guard let current, current.source == source else { return false }
+            stamp = .init(nanoseconds: latest)
+        }
+        invalidations[id, default: [:]][providerID] = .init(source: source, receivedAt: stamp, matchingAttributes: matchingAttributes)
+        if var current {
+            current.validity = .unavailable
+            candidates[id]?[providerID] = current
+        }
+        return true
     }
 
     public func allCandidates(for id: ObservationID) -> [AnyObservation] {

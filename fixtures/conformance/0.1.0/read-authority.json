@@ -267,6 +267,71 @@
       "expectedProviderID": "a",
       "expectedReason": "onlyEligible",
       "expectedValue": 2.0
+    },
+    {
+      "id": "negative-validity-retires-without-receipt-refresh",
+      "events": [
+        {
+          "type": "register",
+          "providerID": "a"
+        },
+        {
+          "type": "present",
+          "providerID": "a"
+        },
+        {
+          "type": "observe",
+          "providerID": "a",
+          "receivedAtSeconds": 1,
+          "value": 1
+        },
+        {
+          "type": "invalidate",
+          "providerID": "a",
+          "receivedAtSeconds": 2
+        }
+      ],
+      "policy": {
+        "freshForSeconds": 5,
+        "providerRanks": {}
+      },
+      "expectedProviderID": null,
+      "expectedReason": "noEligibleCandidates"
+    },
+    {
+      "id": "invalid-first-reconcile-rejects-delayed-measurement",
+      "events": [
+        {
+          "type": "register",
+          "providerID": "a"
+        },
+        {
+          "type": "present",
+          "providerID": "a"
+        },
+        {
+          "type": "invalidate",
+          "providerID": "a",
+          "receivedAtSeconds": 2
+        },
+        {
+          "type": "reconcile",
+          "providerID": "a",
+          "targetProviderID": "b"
+        },
+        {
+          "type": "observe",
+          "providerID": "b",
+          "receivedAtSeconds": 1,
+          "value": 1
+        }
+      ],
+      "policy": {
+        "freshForSeconds": 5,
+        "providerRanks": {}
+      },
+      "expectedProviderID": null,
+      "expectedReason": "noRegisteredCandidates"
     }
   ]
 }

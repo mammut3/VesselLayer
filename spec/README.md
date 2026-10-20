@@ -24,3 +24,16 @@ snapshot after their clock read. Eligibility, candidate value and provider lifec
 must come from that snapshot; a removed provider's observation cannot be combined
 with a newly registered provider generation. Registration tokens are opaque,
 process-local cache ownership evidence and convey no command authority.
+
+Field-validity evidence can retire a reading without supplying a new numeric
+measurement. An ordered negative must be strictly newer than both the last
+measurement and the last matching negative. Adapter-supplied source/session
+attributes constrain which reading it can retire. Retain the old measurement's
+value, provenance and receipt time for diagnostics, with unavailable validity;
+only a strictly newer matching measurement restores eligibility. A negative
+before any measurement also establishes this boundary. Foreign streams do not
+invalidate one another. Reconciliation migrates matching validity boundaries,
+including negative-only slots; removal clears them. Lifecycle retirement is an
+atomic compare-and-set of the captured reading and uses its existing evidence
+boundary, preventing unrelated provider reappearance from restoring that reading.
+These rules do not infer command authority or change other fields' retention.
