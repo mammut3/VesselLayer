@@ -59,6 +59,12 @@ provider matching and capability state, and deterministic read-source selection;
 `VesselLayerTesting` supplies a manual monotonic clock and synthetic-provider
 helpers. Swift tests execute the public cross-language vectors in `fixtures`.
 
+## Reference implementation entry points
+
+For the current executable API, start with [asset inventory](Sources/VesselLayer/Asset.swift), [provider contracts](Sources/VesselLayer/Provider.swift), [observations](Sources/VesselLayer/Observation.swift), [source authority](Sources/VesselLayer/Authority.swift), [capability state](Sources/VesselLayer/Capability.swift) and [qualification/outcomes](Sources/VesselLayer/Evidence.swift). [Package.swift](Package.swift) declares Swift tools 6.0, macOS13/iOS16 minimums and the separate `VesselLayerTesting` product. Consumers may have higher platform requirements.
+
+Use the [conformance guide](docs/CONFORMANCE.md) and [fixtures](fixtures/) alongside runtime tests. There is no VesselLayer UI or screenshot gallery: consumer app captures belong to their own repositories and cannot establish transport or vessel qualification.
+
 ## AI-assisted development
 
 VesselLayer is developed with substantial assistance from AI coding and research tools. Human maintainers direct the project, make architectural and product decisions, review changes, validate behavior, and remain responsible for accepted contributions.
