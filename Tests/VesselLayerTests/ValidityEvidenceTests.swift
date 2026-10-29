@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 import VesselLayerTesting
 @testable import VesselLayer
@@ -10,6 +11,47 @@ struct ValidityEvidenceTests {
         .init(id: .navigationHeading, value: .heading(.init(radians: 1, reference: .trueNorth)),
               source: .init(providerID: provider, attributes: ["stream": stream, "receipt": String(at)]), receivedAt: .init(nanoseconds: at))
     }
+    @Test func publicStreamValidityOwnershipVectors() async throws {
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .appendingPathComponent("../../fixtures/conformance/0.1.0/stream-validity-ownership.json")
+            .standardizedFileURL
+        let file = try JSONDecoder().decode(StreamValidityVectors.self, from: Data(contentsOf: url))
+        #expect(file.schemaVersion == "0.1.0")
+        for vector in file.vectors {
+            let store = VesselObservationStore(clock: ManualClock())
+            await store.register(descriptor)
+            await store.updateProvider(descriptor.id, lifecycle: .present, health: .healthy)
+            await store.ingest(sample(descriptor.id, at: 10, stream: "a"))
+            await store.ingest(sample(descriptor.id, at: 20, stream: "b"))
+            let provisional = TestProviders.descriptor("provisional")
+            if vector.reconcile { await store.register(provisional) }
+            let negativeProvider = vector.reconcile ? provisional.id : descriptor.id
+            if vector.negativeAfterOther {
+                #expect(await store.ingest(sample(descriptor.id, at: vector.otherAt, stream: "b")))
+            }
+            #expect(await store.invalidate(.navigationHeading,
+                from: sample(negativeProvider, at: vector.negativeAt, stream: "a").source,
+                at: .init(nanoseconds: vector.negativeAt), matchingAttributes: ["stream": "a"]), "vector: \(vector.id)")
+            if !vector.negativeAfterOther {
+                #expect(await store.ingest(sample(descriptor.id, at: vector.otherAt, stream: "b")))
+            }
+            if vector.reconcile { await store.reconcileProvider(from: provisional.id, to: descriptor) }
+            #expect(await store.ingest(sample(descriptor.id, at: vector.delayedAt, stream: "a")) == false, "vector: \(vector.id)")
+            let current = try #require(await store.allCandidates(for: .navigationHeading).first)
+            #expect(current.source.attributes["stream"] == "b" && current.validity == .valid, "vector: \(vector.id)")
+            #expect(current.receivedAt.nanoseconds == vector.otherAt, "vector: \(vector.id)")
+            // Inspect retained scope via the public closed-stream cleanup contract.
+            #expect(await store.discardInvalidations(for: descriptor.id, matchingAttributes: ["stream": "a"]) == 1, "vector: \(vector.id)")
+            // Re-establish that same negative-only stream before testing recovery.
+            #expect(await store.invalidate(.navigationHeading,
+                from: sample(descriptor.id, at: vector.negativeAt, stream: "a").source,
+                at: .init(nanoseconds: vector.negativeAt), matchingAttributes: ["stream": "a"]))
+            let recoveryAt = max(vector.negativeAt, vector.otherAt) + 1
+            #expect(await store.ingest(sample(descriptor.id, at: recoveryAt, stream: "a")))
+            #expect(await store.discardInvalidations(for: descriptor.id, matchingAttributes: ["stream": "a"]) == 0)
+        }
+    }
+
     @Test func negativesAreStrictlyOrderedAndKeepLastMeasurement() async throws {
         let store = VesselObservationStore(clock: ManualClock())
         await store.register(descriptor)
@@ -107,4 +149,17 @@ struct ValidityEvidenceTests {
         #expect(await store.ingest(current) == false)
         #expect(await store.ingest(sample(descriptor.id, at: 12)))
     }
+}
+
+private struct StreamValidityVectors: Decodable {
+    let schemaVersion: String
+    let vectors: [StreamValidityVector]
+}
+private struct StreamValidityVector: Decodable {
+    let id: String
+    let negativeAt: UInt64
+    let otherAt: UInt64
+    let delayedAt: UInt64
+    let negativeAfterOther: Bool
+    let reconcile: Bool
 }

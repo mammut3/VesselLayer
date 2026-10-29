@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "0.1.0",
+  "provenance": "original synthetic/public; opaque streams A and B; no vessel or transport data",
+  "schedule": [
+    "register provider, mark present and healthy",
+    "ingest A at 10, B at 20",
+    "record A negative at negativeAt and B measurement at otherAt in the specified arrival order",
+    "for reconciliation case record negative under provisional provider and reconcile into the provider holding B",
+    "delayed A at delayedAt is rejected; B remains valid at otherAt",
+    "a closed-stream cleanup removes exactly one A boundary",
+    "restoring that boundary and then accepting A newer than both timestamps clears only its matching boundary"
+  ],
+  "vectors": [
+    {
+      "id": "foreign-negative-survives-newer-other-stream",
+      "negativeAt": 30,
+      "otherAt": 40,
+      "delayedAt": 25,
+      "negativeAfterOther": false,
+      "reconcile": false
+    },
+    {
+      "id": "delayed-stream-reading-is-newer-than-current-but-older-than-its-negative",
+      "negativeAt": 60,
+      "otherAt": 40,
+      "delayedAt": 50,
+      "negativeAfterOther": false,
+      "reconcile": false
+    },
+    {
+      "id": "foreign-negative-older-than-other-stream-is-still-retained",
+      "negativeAt": 30,
+      "otherAt": 40,
+      "delayedAt": 25,
+      "negativeAfterOther": true,
+      "reconcile": false
+    },
+    {
+      "id": "reconciliation-retains-foreign-negative-older-than-current",
+      "negativeAt": 30,
+      "otherAt": 40,
+      "delayedAt": 25,
+      "negativeAfterOther": false,
+      "reconcile": true
+    }
+  ]
+}

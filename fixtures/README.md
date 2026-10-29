@@ -25,3 +25,10 @@ old completion. No particular concurrency runtime, clock implementation, transpo
 application, device or vessel is required to reproduce that schedule. The Swift
 reference tests execute these vectors with a held clock; the existing lifecycle
 tests also retain normal terminal withdrawal and unchanged-registration behavior.
+
+`stream-validity-ownership.json` uses original synthetic/public streams A and B
+within a provider. Timestamp values are host monotonic units. Its executable
+vectors cover foreign negative retention while B remains healthy, out-of-order
+arrival, delayed A recovery suppression, reconciliation and clearing only the
+boundary matched by a newer accepted reading. The public cleanup count makes
+retention observable separately from the latest-slot timestamp rejection rule.
