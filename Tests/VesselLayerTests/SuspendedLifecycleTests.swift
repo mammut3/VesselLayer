@@ -45,6 +45,24 @@ import Testing
         #expect(await store.providerState(descriptor.id)?.availability == .available)
     }
 
+    @Test func withdrawalRemainsTerminalWithinTheSameRegistration() async throws {
+        let clock = HeldLifecycleClock()
+        let controlled = VesselObservationStore(clock: clock)
+        let descriptor = ProviderDescriptor(id: .init(rawValue: "provider"), vesselID: .init(rawValue: "vessel"), label: "Provider")
+        await controlled.register(descriptor)
+        let registration = await controlled.providerRegistrations()[descriptor.id]
+        await clock.arm()
+        let withdrawal = Task { await controlled.withdrawProvider(descriptor.id) }
+        try await clock.waitUntilHeld()
+        await controlled.updateProvider(descriptor.id, lifecycle: .present, health: .healthy)
+        await clock.release()
+        await withdrawal.value
+        #expect(await controlled.providerState(descriptor.id)?.lifecycle == .withdrawn)
+        await controlled.updateProvider(descriptor.id, lifecycle: .present, health: .healthy)
+        #expect(await controlled.providerState(descriptor.id)?.lifecycle == .withdrawn)
+        #expect(await controlled.providerRegistrations()[descriptor.id] == registration)
+    }
+
     @Test func pendingWithdrawalCannotRestoreRemovedProvider() async throws {
         let clock = HeldLifecycleClock()
         // Use the same controlled clock at every production suspension.

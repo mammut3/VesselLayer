@@ -51,3 +51,13 @@ multiple negatives in one scope retain only the newest boundary.
 An adapter may discard a permanently closed stream's validity boundaries after
 it prevents that stream/session from re-entering. Cleanup does not restore the
 retired diagnostic measurement and must preserve other streams' boundaries.
+
+Suspended withdrawal and reconciliation belong to the registrations present when
+requested. Removing and registering the same identifier creates a new owner;
+completion of an old operation must not change that replacement's descriptor,
+lifecycle, observations or registration. Reconciliation captures both source and
+target ownership, including an absent target: a target registered during the
+suspension must not be merged by the old operation. Unchanged registrations retain
+normal reconciliation behavior. Withdrawal remains terminal within its original
+registration; a later ordinary presence/health update does not cancel withdrawal.
+This ownership rule conveys no control authorization.

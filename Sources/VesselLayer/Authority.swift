@@ -150,8 +150,10 @@ public actor VesselObservationStore {
     }
 
     public func withdrawProvider(_ id: ProviderID) async {
+        guard let registration = providerRegistrationIDs[id] else { return }
         let now = await clock.now()
-        guard var state = providers[id] else { return }
+        guard providerRegistrationIDs[id] == registration,
+              var state = providers[id] else { return }
         state.lifecycle = .withdrawn; state.updatedAt = now; providers[id] = state
     }
 
@@ -179,7 +181,14 @@ public actor VesselObservationStore {
     /// leaving the provisional source eligible as a duplicate candidate.
     public func reconcileProvider(from provisionalID: ProviderID,
                                   to durableDescriptor: ProviderDescriptor) async {
+        // The operation belongs to these registrations, not to identifiers that
+        // may be removed and reused while the clock read is suspended. Capture
+        // target absence too: a newly registered target is a different owner.
+        guard let registration = providerRegistrationIDs[provisionalID] else { return }
+        let targetRegistration = providerRegistrationIDs[durableDescriptor.id]
         let now = await clock.now()
+        guard providerRegistrationIDs[provisionalID] == registration,
+              providerRegistrationIDs[durableDescriptor.id] == targetRegistration else { return }
         guard provisionalID != durableDescriptor.id,
               let provisional = providers[provisionalID]
         else {
