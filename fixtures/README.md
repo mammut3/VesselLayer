@@ -14,3 +14,26 @@ The vectors under `conformance/0.1.0` are original synthetic/public scenarios.
 They exercise provider lifecycle, controlled time, freshness, deterministic
 read authority, asset enrichment, disappearance/reappearance, and explicit
 ambiguous/conflicting identity states. They contain no vessel-derived data.
+
+`provider-registration-ownership.json` is original synthetic/public scheduling
+conformance evidence. Its common schedule pauses the named operation before its
+timestamp is returned, replaces the named registration, then completes the old
+operation. `source` and `target` are generic provider identifiers. An absent target
+is also captured ownership state. Each vector expects all provider states,
+registration identities and observations to equal the snapshot immediately before
+old completion. No particular concurrency runtime, clock implementation, transport,
+application, device or vessel is required to reproduce that schedule. The Swift
+reference tests execute these vectors with a held clock; the existing lifecycle
+tests also retain normal terminal withdrawal and unchanged-registration behavior.
+
+`stream-validity-ownership.json` uses original synthetic/public streams A and B
+within a provider. Timestamp values are host monotonic units. Its executable
+vectors cover foreign negative retention while B remains healthy, out-of-order
+arrival, delayed A recovery suppression, reconciliation and clearing only the
+boundary matched by a newer accepted reading. The public cleanup count makes
+retention observable separately from the latest-slot timestamp rejection rule.
+
+Both ownership fixtures select their dedicated Draft 2020-12 schemas through
+`$schema` and participate in the existing complete conformance validation. The
+schemas validate envelope and vector structure; the Swift reference tests execute
+the scheduling and cross-field timing expectations.

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://vessellayer.org/schema/0.1.0/provider-registration-ownership.schema.json",
+  "schemaVersion": "0.1.0",
+  "provenance": "original synthetic/public; no vessel data or external material",
+  "schedule": [
+    "register source and optional target",
+    "start operation and suspend before its timestamp is returned",
+    "remove replacement identifier if present",
+    "register replacement with same identifier and new descriptor",
+    "mark replacement present and healthy; ingest replacement observation",
+    "complete suspended operation"
+  ],
+  "vectors": [
+    {
+      "id": "withdrawal-source-replaced",
+      "operation": "withdraw",
+      "replacement": "source",
+      "targetInitiallyPresent": false,
+      "expected": "stateAndRegistrationsUnchangedAfterOldCompletion"
+    },
+    {
+      "id": "same-identity-reconciliation-source-replaced",
+      "operation": "reconcileSame",
+      "replacement": "source",
+      "targetInitiallyPresent": false,
+      "expected": "stateAndRegistrationsUnchangedAfterOldCompletion"
+    },
+    {
+      "id": "reconciliation-source-replaced",
+      "operation": "reconcileDifferent",
+      "replacement": "source",
+      "targetInitiallyPresent": false,
+      "expected": "stateAndRegistrationsUnchangedAfterOldCompletion"
+    },
+    {
+      "id": "reconciliation-target-replaced",
+      "operation": "reconcileDifferent",
+      "replacement": "target",
+      "targetInitiallyPresent": true,
+      "expected": "stateAndRegistrationsUnchangedAfterOldCompletion"
+    },
+    {
+      "id": "reconciliation-target-created",
+      "operation": "reconcileDifferent",
+      "replacement": "target",
+      "targetInitiallyPresent": false,
+      "expected": "stateAndRegistrationsUnchangedAfterOldCompletion"
+    }
+  ]
+}

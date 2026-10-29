@@ -45,9 +45,27 @@ an older completion cannot mutate a later registration of the same identifier.
 Validity boundaries are retained per adapter-supplied stream scope through
 identity reconciliation. A foreign-stream negative does not retire a current
 reading, but must still reject an older measurement if that stream later becomes
-the identified source. New measurements prune boundaries older than their receipt;
+the identified source. New measurements prune only matching-stream boundaries older than their receipt;
 multiple negatives in one scope retain only the newest boundary.
 
 An adapter may discard a permanently closed stream's validity boundaries after
 it prevents that stream/session from re-entering. Cleanup does not restore the
 retired diagnostic measurement and must preserve other streams' boundaries.
+
+Suspended withdrawal and reconciliation belong to the registrations present when
+requested. Removing and registering the same identifier creates a new owner;
+completion of an old operation must not change that replacement's descriptor,
+lifecycle, observations or registration. Reconciliation captures both source and
+target ownership, including an absent target: a target registered during the
+suspension must not be merged by the old operation. Unchanged registrations retain
+normal reconciliation behavior. Withdrawal remains terminal within its original
+registration; a later ordinary presence/health update does not cancel withdrawal.
+This ownership rule conveys no control authorization.
+
+A timestamped negative for one stream is retained even when a healthy reading
+from another stream occupies the provider's latest-value slot. Only a matching
+reading and that negative's prior scope boundary constrain its timestamp; foreign
+readings neither block it nor become unavailable. Reconciliation and later readings
+from other streams preserve the boundary. The negative's source must satisfy its
+matching attributes. Nil-time lifecycle retirement remains an exact-source
+compare-and-set of the current valid reading, not a foreign-stream negative.

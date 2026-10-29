@@ -150,8 +150,10 @@ public actor VesselObservationStore {
     }
 
     public func withdrawProvider(_ id: ProviderID) async {
+        guard let registration = providerRegistrationIDs[id] else { return }
         let now = await clock.now()
-        guard var state = providers[id] else { return }
+        guard providerRegistrationIDs[id] == registration,
+              var state = providers[id] else { return }
         state.lifecycle = .withdrawn; state.updatedAt = now; providers[id] = state
     }
 
@@ -179,7 +181,14 @@ public actor VesselObservationStore {
     /// leaving the provisional source eligible as a duplicate candidate.
     public func reconcileProvider(from provisionalID: ProviderID,
                                   to durableDescriptor: ProviderDescriptor) async {
+        // The operation belongs to these registrations, not to identifiers that
+        // may be removed and reused while the clock read is suspended. Capture
+        // target absence too: a newly registered target is a different owner.
+        guard let registration = providerRegistrationIDs[provisionalID] else { return }
+        let targetRegistration = providerRegistrationIDs[durableDescriptor.id]
         let now = await clock.now()
+        guard providerRegistrationIDs[provisionalID] == registration,
+              providerRegistrationIDs[durableDescriptor.id] == targetRegistration else { return }
         guard provisionalID != durableDescriptor.id,
               let provisional = providers[provisionalID]
         else {
@@ -238,7 +247,7 @@ public actor VesselObservationStore {
                 // Keep foreign-stream negatives through a late identity handover;
                 // they do not retire this reading but still order their own stream.
                 invalidations[observationID]?[durableDescriptor.id]?.removeAll {
-                    $0.receivedAt.nanoseconds < observation.receivedAt.nanoseconds
+                    $0.matches(observation.source) && $0.receivedAt.nanoseconds < observation.receivedAt.nanoseconds
                 }
             }
         }
@@ -271,7 +280,9 @@ public actor VesselObservationStore {
         // Equal timestamps retain arrival-order replacement, including invalidation.
         if let current = candidates[observation.id]?[observation.source.providerID],
            current.receivedAt.nanoseconds > observation.receivedAt.nanoseconds { return false }
-        invalidations[observation.id]?[providerID]?.removeAll { $0.receivedAt.nanoseconds < observation.receivedAt.nanoseconds }
+        invalidations[observation.id]?[providerID]?.removeAll {
+            $0.matches(observation.source) && $0.receivedAt.nanoseconds < observation.receivedAt.nanoseconds
+        }
         candidates[observation.id, default: [:]][providerID] = observation
         return true
     }
@@ -286,15 +297,15 @@ public actor VesselObservationStore {
                                               matchingAttributes: [String: String]) -> Bool {
         let providerID = source.providerID
         guard providers[providerID] != nil else { return false }
-        let current = candidates[id]?[providerID]
         let previous = invalidations[id]?[providerID]?.filter { $0.matchingAttributes == matchingAttributes }
             .max { $0.receivedAt.nanoseconds < $1.receivedAt.nanoseconds }
         func matches(_ candidate: ObservationSource) -> Bool {
             matchingAttributes.allSatisfy { candidate.attributes[$0.key] == $0.value }
         }
-        // An already retired diagnostic from another stream must not prevent a
-        // replacement stream from establishing its own negative-only boundary.
-        if let current, current.validity == .valid, !matches(current.source) { return false }
+        guard matches(source) else { return false }
+        // Only this stream's reading orders or is retired by its negative.
+        // A healthy foreign reading stays current without losing this boundary.
+        let current = candidates[id]?[providerID].flatMap { matches($0.source) ? $0 : nil }
         let latest = max(current?.receivedAt.nanoseconds ?? 0, previous?.receivedAt.nanoseconds ?? 0)
         let stamp: MonotonicInstant
         if let receivedAt {
