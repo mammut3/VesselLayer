@@ -32,3 +32,8 @@ vectors cover foreign negative retention while B remains healthy, out-of-order
 arrival, delayed A recovery suppression, reconciliation and clearing only the
 boundary matched by a newer accepted reading. The public cleanup count makes
 retention observable separately from the latest-slot timestamp rejection rule.
+
+Both ownership fixtures select their dedicated Draft 2020-12 schemas through
+`$schema` and participate in the existing complete conformance validation. The
+schemas validate envelope and vector structure; the Swift reference tests execute
+the scheduling and cross-field timing expectations.

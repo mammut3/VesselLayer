@@ -1,4 +1,5 @@
 {
+  "$schema": "https://vessellayer.org/schema/0.1.0/provider-registration-ownership.schema.json",
   "schemaVersion": "0.1.0",
   "provenance": "original synthetic/public; no vessel data or external material",
   "schedule": [

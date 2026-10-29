@@ -1,4 +1,5 @@
 {
+  "$schema": "https://vessellayer.org/schema/0.1.0/stream-validity-ownership.schema.json",
   "schemaVersion": "0.1.0",
   "provenance": "original synthetic/public; opaque streams A and B; no vessel or transport data",
   "schedule": [
